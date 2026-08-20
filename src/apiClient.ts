@@ -1,4 +1,10 @@
 import { fetchTmdbTitle, resolveTmdbCredentials, searchTmdb, trendingTmdb, TmdbError, TmdbMediaType } from '../shared/tmdbService';
+import {
+  completeTmdbWriteAuth,
+  startTmdbWriteAuth,
+  syncItemsToTmdbList,
+  TmdbListSyncItem,
+} from '../shared/tmdbListSync';
 import { searchTvmazeShows } from '../shared/tvmazeService';
 import { getStoredTmdbToken } from './tmdbToken';
 import { Series } from './types';
@@ -113,11 +119,24 @@ async function handleStatically(url: URL, init?: RequestInit): Promise<Response>
     return json({ success: true, importedCount: remaining.length });
   }
 
+  // TMDB list writes go straight to api.themoviedb.org (CORS-enabled), so they work here too.
+  if (pathname === '/api/tmdb/auth-start' && method === 'POST') {
+    const { requestToken, authUrl } = await startTmdbWriteAuth(body.readToken, window.location.href);
+    return json({ success: true, request_token: requestToken, authUrl });
+  }
+  if (pathname === '/api/tmdb/auth-complete' && method === 'POST') {
+    const { accessToken, accountId } = await completeTmdbWriteAuth(body.readToken, body.requestToken);
+    const items = (body.watchlistSeries ?? []) as TmdbListSyncItem[];
+    const sync = await syncItemsToTmdbList(body.listId, accessToken, items);
+    return json({ success: true, userAccessToken: accessToken, accountId, ...sync });
+  }
+  if (pathname === '/api/tmdb/sync-to-list' && method === 'POST') {
+    const items = (body.watchlistSeries ?? []) as TmdbListSyncItem[];
+    return json({ success: true, ...(await syncItemsToTmdbList(body.listId, body.apiKey, items)) });
+  }
+
   if (pathname === '/api/series/ai-season-intel') return unavailable('AI season intelligence');
   if (pathname === '/api/bingecat/export.json') return unavailable('The Bingecat/Stremio addon');
-  if (pathname.startsWith('/api/tmdb/auth') || pathname === '/api/tmdb/sync-to-list') {
-    return unavailable('Syncing your watchlist to a TMDB list');
-  }
 
   return json({ error: `No static handler for ${pathname}` }, 501);
 }

@@ -18,6 +18,9 @@ import {
   Zap,
 } from 'lucide-react';
 import { Series } from '../types';
+import { getStoredTmdbToken, storeTmdbToken } from '../tmdbToken';
+
+const WRITE_TOKEN_KEY = 'streampulse_tmdb_write_token';
 
 interface TmdbSyncModalProps {
   isOpen: boolean;
@@ -37,7 +40,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
     return localStorage.getItem('streampulse_tmdb_list_id') || '8687068';
   });
   const [tmdbApiKey, setTmdbApiKey] = useState<string>(() => {
-    return localStorage.getItem('streampulse_tmdb_api_key') || 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzM2MyNmU1YzdjNGJlN2NiOTdhZDU1YzBmZGZjMDRlMSIsIm5iZiI6MTc2NjI3NTQwOC4zMjA5OTk5LCJzdWIiOiI2OTQ3Mzk1MDZmYWUzYzI2ZWE4ZWIzODEiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.n41egJd2d7CEjaexzp1GHcZlXTSFQnXKVHQLEpzXPNM';
+    return localStorage.getItem('streampulse_tmdb_api_key') || getStoredTmdbToken();
   });
   const [pendingRequestToken, setPendingRequestToken] = useState<string>('');
   const [isAuthorizing, setIsAuthorizing] = useState<boolean>(false);
@@ -60,6 +63,8 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
   const handleSaveSettings = () => {
     localStorage.setItem('streampulse_tmdb_list_id', tmdbListId.trim());
     localStorage.setItem('streampulse_tmdb_api_key', tmdbApiKey.trim());
+    // Share the token with search/import so a key only has to be pasted once.
+    storeTmdbToken(tmdbApiKey);
   };
 
   const handleCopy = (text: string, id: string) => {
@@ -79,7 +84,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
       const res = await apiFetch('/api/tmdb/auth-start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ readToken: tmdbApiKey.trim() }),
+        body: JSON.stringify({ readToken: tmdbApiKey.trim(), redirectTo: window.location.href }),
       });
       const data = await res.json();
       if (res.ok && data.request_token && data.authUrl) {
@@ -127,6 +132,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
             title: s.title,
             tmdbId: s.tmdbId,
             imdbId: s.imdbId,
+            mediaType: s.mediaType,
           })),
         }),
       });
@@ -134,7 +140,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
       const data = await res.json();
       if (res.ok && data.success) {
         if (data.userAccessToken) {
-          localStorage.setItem('streampulse_tmdb_write_token', data.userAccessToken);
+          localStorage.setItem(WRITE_TOKEN_KEY, data.userAccessToken);
         }
         setPendingRequestToken('');
         setSyncStatus({
@@ -168,12 +174,21 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
       return;
     }
 
+    const savedWriteToken = localStorage.getItem(WRITE_TOKEN_KEY);
+    if (!savedWriteToken) {
+      setSyncStatus({
+        success: false,
+        message:
+          'TMDB needs your permission before StreamPulse can write to a list. Click "1-Click TMDB Authorize" to grant it.',
+      });
+      return;
+    }
+
     setIsSyncing(true);
     setSyncStatus(null);
 
     try {
-      const savedWriteToken = localStorage.getItem('streampulse_tmdb_write_token');
-      const tokenToUse = savedWriteToken || tmdbApiKey.trim();
+      const tokenToUse = savedWriteToken;
 
       const res = await apiFetch('/api/tmdb/sync-to-list', {
         method: 'POST',
@@ -186,6 +201,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
             title: s.title,
             tmdbId: s.tmdbId,
             imdbId: s.imdbId,
+            mediaType: s.mediaType,
           })),
         }),
       });
@@ -198,10 +214,11 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
           message: data.message || `Successfully synced ${watchlistedSeries.length} series to TMDB!`,
         });
       } else {
-        // If write permission is needed, prompt the 1-click approval button
+        // A rejected token usually means the approval expired: re-run the 1-click flow.
+        if (res.status === 401) localStorage.removeItem(WRITE_TOKEN_KEY);
         setSyncStatus({
           success: false,
-          message: data.error || 'Write authorization needed from TMDB. Click "Authorize 1-Click Sync" below.',
+          message: data.error || 'Write authorization needed from TMDB. Click "1-Click TMDB Authorize" below.',
         });
       }
     } catch (e: any) {
@@ -325,12 +342,12 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                  <span>TMDB API Read Access Token / API Key (Optional)</span>
+                  <span>TMDB API Read Access Token (required for sync)</span>
                   <span className="text-[10px] text-zinc-400 font-normal">From themoviedb.org/settings/api</span>
                 </label>
                 <input
                   type="password"
-                  placeholder="Paste your TMDB API Key if automated write-sync is enabled"
+                  placeholder="Paste your TMDB API Read Access Token, then click 1-Click TMDB Authorize"
                   value={tmdbApiKey}
                   onChange={(e) => setTmdbApiKey(e.target.value)}
                   className="w-full bg-zinc-900 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-500 focus:outline-hidden focus:border-teal-500 transition-all font-mono"
