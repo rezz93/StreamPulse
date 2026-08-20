@@ -132,6 +132,8 @@ export default function App() {
     if (addToWatchlist) {
       setWatchlist((prev) => (prev.includes(series.id) ? prev : [...prev, series.id]));
     }
+    // Jump to the tab that actually shows the imported title.
+    setActiveCategory(series.mediaType === 'movie' ? 'movies' : 'now_playing');
   };
 
   const handleOpenDetail = (series: Series) => {
@@ -152,22 +154,29 @@ export default function App() {
 
   // Categorized counts
   const categoryCounts = useMemo(() => {
-    const upcoming = seriesList.filter((s) => s.isUpcoming || (s.nextSeasonDaysLeft !== undefined && s.nextSeasonDaysLeft <= 180)).length;
-    const newSeasons = seriesList.filter((s) => s.hasNewSeasonAlert || ['season_upcoming', 'renewed', 'in_production', 'final_season_upcoming'].includes(s.renewalState)).length;
+    const shows = seriesList.filter((s) => s.mediaType !== 'movie');
+    const upcoming = shows.filter((s) => s.isUpcoming || (s.nextSeasonDaysLeft !== undefined && s.nextSeasonDaysLeft <= 180)).length;
+    const newSeasons = shows.filter((s) => s.hasNewSeasonAlert || ['season_upcoming', 'renewed', 'in_production', 'final_season_upcoming'].includes(s.renewalState)).length;
     return {
       upcoming,
       newSeasons,
-      total: seriesList.length,
+      movies: seriesList.filter((s) => s.mediaType === 'movie').length,
+      total: shows.length,
     };
   }, [seriesList]);
 
   // Filtered series list based on active options
   const filteredSeries = useMemo(() => {
-    let list = [...seriesList];
+    // Movies live in their own tab; every other tab tracks series only.
+    let list = seriesList.filter((s) =>
+      activeCategory === 'movies' || activeCategory === 'watchlist' ? true : s.mediaType !== 'movie'
+    );
 
     // Category Filter
     if (activeCategory === 'now_playing') {
       list = list.filter((s) => s.isNowPlaying);
+    } else if (activeCategory === 'movies') {
+      list = list.filter((s) => s.mediaType === 'movie');
     } else if (activeCategory === 'upcoming') {
       list = list.filter((s) => s.isUpcoming || (s.nextSeasonDaysLeft !== undefined && s.nextSeasonDaysLeft > 0 && s.nextSeasonDaysLeft <= 180));
     } else if (activeCategory === 'new_seasons') {
@@ -225,6 +234,8 @@ export default function App() {
     return list;
   }, [seriesList, activeCategory, selectedProvider, selectedGenre, searchQuery, sortBy, watchlist]);
 
+  const isMoviesView = activeCategory === 'movies';
+
   // Watchlisted series full objects
   const watchlistedSeriesObjects = useMemo(() => {
     return seriesList.filter((s) => watchlist.includes(s.id));
@@ -244,13 +255,13 @@ export default function App() {
         onSearchChange={setSearchQuery}
         onOpenLiveSearch={() => setIsGlobalSearchOpen(true)}
         onOpenAndroidModal={() => setIsAndroidModalOpen(true)}
-        onOpenBingecatModal={() => setIsBingecatModalOpen(true)}
         onOpenTmdbModal={() => setIsTmdbModalOpen(true)}
         onOpenTmdbBrowse={() => setIsTmdbBrowseOpen(true)}
         activeCategory={activeCategory}
         onSelectCategory={setActiveCategory}
         watchlistCount={watchlist.length}
         totalSeriesCount={categoryCounts.total}
+
         upcomingCount={categoryCounts.upcoming}
         renewalsCount={categoryCounts.newSeasons}
       />
@@ -264,6 +275,7 @@ export default function App() {
           watchlistCount={watchlist.length}
           newSeasonsCount={categoryCounts.newSeasons}
           upcomingCount={categoryCounts.upcoming}
+          moviesCount={categoryCounts.movies}
         />
 
         {/* Streaming Providers Bar */}
@@ -369,11 +381,19 @@ export default function App() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                  <Flame className="w-5 h-5 text-rose-400" />
-                  <span>Now Streaming Series ({filteredSeries.length})</span>
+                  {isMoviesView ? (
+                    <Film className="w-5 h-5 text-teal-400" />
+                  ) : (
+                    <Flame className="w-5 h-5 text-rose-400" />
+                  )}
+                  <span>
+                    {isMoviesView ? 'Movies' : 'Now Streaming Series'} ({filteredSeries.length})
+                  </span>
                 </h2>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  Currently active, returning, and acclaimed series across major platforms
+                  {isMoviesView
+                    ? 'Films you imported from TMDB — use "Add from TMDB" to add more'
+                    : 'Currently active, returning, and acclaimed series across major platforms'}
                 </p>
               </div>
             </div>
@@ -398,9 +418,13 @@ export default function App() {
             ) : (
               <div className="p-12 text-center bg-zinc-900/40 rounded-3xl border border-zinc-800 space-y-3">
                 <Search className="w-8 h-8 text-zinc-500 mx-auto" />
-                <h3 className="text-base font-bold text-white">No Series Found</h3>
+                <h3 className="text-base font-bold text-white">
+                  {isMoviesView ? 'No Movies Yet' : 'No Series Found'}
+                </h3>
                 <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                  No series match your current filter combination. Try clearing filters or searching for another title.
+                  {isMoviesView
+                    ? 'Import films with "Add from TMDB" — they show up here.'
+                    : 'No series match your current filter combination. Try clearing filters or searching for another title.'}
                 </p>
                 <button
                   onClick={() => {

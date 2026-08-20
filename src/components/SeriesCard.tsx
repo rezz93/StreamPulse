@@ -108,7 +108,9 @@ export const SeriesCard: React.FC<SeriesCardProps> = ({
             <span>•</span>
             <span className="flex items-center gap-1 font-medium text-zinc-300">
               <Film className="w-3 h-3 text-zinc-500" />
-              {series.totalSeasons} {series.totalSeasons === 1 ? 'Season' : 'Seasons'}
+              {series.mediaType === 'movie'
+                ? 'Film'
+                : `${series.totalSeasons} ${series.totalSeasons === 1 ? 'Season' : 'Seasons'}`}
             </span>
             <span>•</span>
             <span>{series.decade}</span>

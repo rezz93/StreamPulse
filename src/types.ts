@@ -21,6 +21,7 @@ export interface StreamingProvider {
 
 export type SeriesCategory =
   | 'now_playing'
+  | 'movies'
   | 'upcoming'
   | 'new_seasons'
   | 'classics'
