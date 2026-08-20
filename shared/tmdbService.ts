@@ -21,8 +21,14 @@ export class TmdbError extends Error {
   }
 }
 
+/** Environment keys are only available server-side; in the browser only an explicit token counts. */
+function envToken(): string {
+  if (typeof process === 'undefined' || !process.env) return '';
+  return process.env.TMDB_READ_ACCESS_TOKEN || process.env.TMDB_API_KEY || '';
+}
+
 export function resolveTmdbCredentials(clientToken?: string): TmdbCredentials | null {
-  const token = (clientToken || process.env.TMDB_READ_ACCESS_TOKEN || process.env.TMDB_API_KEY || '').trim();
+  const token = (clientToken || envToken()).trim();
   if (!token) return null;
   return { token, isBearer: token.length > 40 || token.startsWith('eyJ') };
 }

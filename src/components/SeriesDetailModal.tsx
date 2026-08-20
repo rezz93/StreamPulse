@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '../apiClient';
 import { Series, AISeasonIntel } from '../types';
 import { ProviderBadge } from './ProviderBadge';
 import { StatusBadge } from './StatusBadge';
@@ -71,7 +72,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
     setIsLoadingIntel(true);
     setIntelError(null);
     try {
-      const response = await fetch('/api/series/ai-season-intel', {
+      const response = await apiFetch('/api/series/ai-season-intel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -80,15 +81,14 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
         }),
       });
 
+      const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error('Failed to generate season intelligence');
+        throw new Error(payload.error || 'Failed to generate season intelligence');
       }
 
-      const data: AISeasonIntel = await response.json();
-      setAiIntel(data);
+      setAiIntel(payload as AISeasonIntel);
     } catch (err: any) {
-      console.error(err);
-      setIntelError('Could not retrieve AI season intelligence at this time.');
+      setIntelError(err?.message || 'Could not retrieve AI season intelligence at this time.');
     } finally {
       setIsLoadingIntel(false);
     }

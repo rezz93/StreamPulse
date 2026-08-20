@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { apiFetch } from '../apiClient';
 import { Series } from '../types';
 import { Search, X, Loader2, Tv, Sparkles, Star, Plus } from 'lucide-react';
 import { ProviderBadge } from './ProviderBadge';
@@ -28,7 +29,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     setIsLoading(true);
     setHasSearched(true);
     try {
-      const res = await fetch(`/api/series/live-search?q=${encodeURIComponent(query)}`);
+      const res = await apiFetch(`/api/series/live-search?q=${encodeURIComponent(query)}`);
       const data = await res.json();
       setResults(data.results || []);
     } catch (err) {

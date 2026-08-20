@@ -1,26 +1,8 @@
+import { apiFetch } from './apiClient';
+import { getStoredTmdbToken, storeTmdbToken } from './tmdbToken';
 import { Series } from './types';
 
-const TOKEN_STORAGE_KEY = 'streampulse_tmdb_token';
-
-export function getStoredTmdbToken(): string {
-  try {
-    return localStorage.getItem(TOKEN_STORAGE_KEY) || '';
-  } catch {
-    return '';
-  }
-}
-
-export function storeTmdbToken(token: string) {
-  try {
-    if (token.trim()) {
-      localStorage.setItem(TOKEN_STORAGE_KEY, token.trim());
-    } else {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
-    }
-  } catch {
-    // Ignore storage failures (private mode / disabled storage)
-  }
-}
+export { getStoredTmdbToken, storeTmdbToken };
 
 function tmdbHeaders(extra: Record<string, string> = {}): Record<string, string> {
   const token = getStoredTmdbToken();
@@ -42,12 +24,12 @@ async function readJson(res: Response) {
 }
 
 export async function fetchTmdbStatus(): Promise<{ configured: boolean; importedCount: number }> {
-  const res = await fetch('/api/tmdb/status');
+  const res = await apiFetch('/api/tmdb/status');
   return readJson(res);
 }
 
 export async function searchTmdbTitles(query: string, type: 'multi' | 'tv' | 'movie'): Promise<Series[]> {
-  const res = await fetch(`/api/tmdb/search?q=${encodeURIComponent(query)}&type=${type}`, {
+  const res = await apiFetch(`/api/tmdb/search?q=${encodeURIComponent(query)}&type=${type}`, {
     headers: tmdbHeaders(),
   });
   const data = await readJson(res);
@@ -55,7 +37,7 @@ export async function searchTmdbTitles(query: string, type: 'multi' | 'tv' | 'mo
 }
 
 export async function fetchTmdbTrending(type: 'all' | 'tv' | 'movie'): Promise<Series[]> {
-  const res = await fetch(`/api/tmdb/trending?type=${type}`, { headers: tmdbHeaders() });
+  const res = await apiFetch(`/api/tmdb/trending?type=${type}`, { headers: tmdbHeaders() });
   const data = await readJson(res);
   return data.results || [];
 }
@@ -64,7 +46,7 @@ export async function importTmdbTitle(
   mediaType: 'tv' | 'movie',
   tmdbId: number
 ): Promise<{ series: Series; alreadyInCatalog: boolean }> {
-  const res = await fetch('/api/catalog/tmdb', {
+  const res = await apiFetch('/api/catalog/tmdb', {
     method: 'POST',
     headers: tmdbHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ mediaType, tmdbId }),
@@ -73,6 +55,6 @@ export async function importTmdbTitle(
 }
 
 export async function removeTmdbTitle(id: string): Promise<void> {
-  const res = await fetch(`/api/catalog/tmdb/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  const res = await apiFetch(`/api/catalog/tmdb/${encodeURIComponent(id)}`, { method: 'DELETE' });
   await readJson(res);
 }

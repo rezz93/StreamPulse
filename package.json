@@ -7,6 +7,8 @@
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
+    "build:static": "VITE_STATIC_BUILD=true vite build && tsx scripts/generateStaticApi.ts dist/api && touch dist/.nojekyll",
+    "preview:static": "vite preview --outDir dist",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
   },

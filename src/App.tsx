@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { apiFetch } from './apiClient';
 import {
   Series,
   StreamingProvider,
@@ -80,7 +81,7 @@ export default function App() {
     try {
       localStorage.setItem('streampulse_watchlist', JSON.stringify(watchlist));
       // Sync with server backend for Bingecat Addon catalog
-      fetch('/api/watchlist/sync', {
+      apiFetch('/api/watchlist/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ watchlist })
@@ -96,8 +97,8 @@ export default function App() {
       setIsLoading(true);
       try {
         const [provRes, seriesRes] = await Promise.all([
-          fetch('/api/providers'),
-          fetch('/api/series')
+          apiFetch('/api/providers'),
+          apiFetch('/api/series')
         ]);
         const provData = await provRes.json();
         const seriesData = await seriesRes.json();

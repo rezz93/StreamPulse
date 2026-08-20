@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { apiFetch } from '../apiClient';
 import {
   X,
   ExternalLink,
@@ -75,7 +76,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
     setIsAuthorizing(true);
     setSyncStatus(null);
     try {
-      const res = await fetch('/api/tmdb/auth-start', {
+      const res = await apiFetch('/api/tmdb/auth-start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ readToken: tmdbApiKey.trim() }),
@@ -114,7 +115,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
     setIsSyncing(true);
     setSyncStatus(null);
     try {
-      const res = await fetch('/api/tmdb/auth-complete', {
+      const res = await apiFetch('/api/tmdb/auth-complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -174,7 +175,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
       const savedWriteToken = localStorage.getItem('streampulse_tmdb_write_token');
       const tokenToUse = savedWriteToken || tmdbApiKey.trim();
 
-      const res = await fetch('/api/tmdb/sync-to-list', {
+      const res = await apiFetch('/api/tmdb/sync-to-list', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -13,7 +13,8 @@ import {
   resolveTmdbCredentials,
   searchTmdb,
   trendingTmdb,
-} from "./server/tmdbService";
+} from "./shared/tmdbService";
+import { searchTvmazeShows } from "./shared/tvmazeService";
 import { Series, StreamingProviderId } from "./src/types";
 
 let seriesDatabase: Series[] = INITIAL_SERIES_DATABASE.map(s => {
@@ -201,75 +202,7 @@ async function startServer() {
     }
 
     try {
-      const response = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(query)}`);
-      if (!response.ok) {
-        throw new Error(`TVMaze API returned status ${response.status}`);
-      }
-      const data = await response.json() as Array<{ show: any }>;
-
-      // Map TVMaze results into our Series model
-      const results: Series[] = data.slice(0, 10).map(({ show }) => {
-        const networkName = show.webChannel?.name || show.network?.name || 'Streaming';
-        let matchedProvider: StreamingProviderId = 'netflix';
-        const netLower = networkName.toLowerCase();
-        if (netLower.includes('apple')) matchedProvider = 'appletv';
-        else if (netLower.includes('hbo') || netLower.includes('max')) matchedProvider = 'max';
-        else if (netLower.includes('amazon') || netLower.includes('prime')) matchedProvider = 'prime';
-        else if (netLower.includes('disney')) matchedProvider = 'disney';
-        else if (netLower.includes('hulu')) matchedProvider = 'hulu';
-        else if (netLower.includes('paramount') || netLower.includes('cbs') || netLower.includes('showtime')) matchedProvider = 'paramount';
-        else if (netLower.includes('peacock') || netLower.includes('nbc')) matchedProvider = 'peacock';
-
-        const premiereYear = show.premiered ? parseInt(show.premiered.slice(0, 4), 10) : 2024;
-        let decade: '70s' | '80s' | '90s' | '2000s' | '2010s' | '2020s' = '2020s';
-        if (premiereYear < 1980) decade = '70s';
-        else if (premiereYear < 1990) decade = '80s';
-        else if (premiereYear < 2000) decade = '90s';
-        else if (premiereYear < 2010) decade = '2000s';
-        else if (premiereYear < 2020) decade = '2010s';
-
-        const isEnded = show.status === 'Ended';
-
-        return {
-          id: `tvm-${show.id}`,
-          title: show.name,
-          tagline: show.type || 'Television Series',
-          synopsis: show.summary ? show.summary.replace(/<[^>]*>?/gm, '') : 'No overview available.',
-          posterUrl: show.image?.original || show.image?.medium || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80',
-          backdropUrl: show.image?.original || 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1600&auto=format&fit=crop&q=80',
-          providers: [matchedProvider],
-          primaryProvider: matchedProvider,
-          genres: show.genres?.length ? show.genres : ['Drama'],
-          rating: show.rating?.average ? Number(show.rating.average) : 7.5,
-          ratingCount: 'Verified TV Guide',
-          contentRating: 'TV-14',
-          firstAirYear: premiereYear,
-          decade: decade,
-          totalSeasons: 1,
-          totalEpisodes: 10,
-          status: isEnded ? 'Ended' : 'Returning Series',
-          isNowPlaying: !isEnded,
-          isUpcoming: false,
-          isClassic: premiereYear < 2018 || isEnded,
-          hasNewSeasonAlert: !isEnded,
-          renewalState: isEnded ? 'concluded' : 'renewed',
-          renewalBadgeText: isEnded ? 'Ended / Complete Series' : 'Active / Returning Broadcast',
-          network: networkName,
-          cast: [],
-          seasons: [
-            {
-              seasonNumber: 1,
-              title: 'Season 1',
-              episodeCount: 8,
-              releaseDate: show.premiered || '2024-01-01',
-              status: isEnded ? 'released' : 'airing',
-              overview: 'Season episodes and broadcast schedule.'
-            }
-          ]
-        };
-      });
-
-      res.json({ results });
+      res.json({ results: await searchTvmazeShows(query) });
     } catch (err: any) {
       console.error("TVMaze proxy error:", err);
       res.status(500).json({ error: "Failed to fetch live show data" });

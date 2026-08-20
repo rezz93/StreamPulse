@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '../apiClient';
 import {
   X,
   Copy,
@@ -30,6 +31,7 @@ export const BingecatSyncModal: React.FC<BingecatSyncModalProps> = ({
   const [copiedJson, setCopiedJson] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'addon' | 'json'>('addon');
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -48,11 +50,20 @@ export const BingecatSyncModal: React.FC<BingecatSyncModalProps> = ({
     }
   };
 
+  const fetchExport = async () => {
+    const res = await apiFetch('/api/bingecat/export.json');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Export failed with status ${res.status}`);
+    }
+    return data;
+  };
+
   const handleDownloadJson = async () => {
     setIsDownloading(true);
+    setExportError(null);
     try {
-      const res = await fetch('/api/bingecat/export.json');
-      const data = await res.json();
+      const data = await fetchExport();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -63,23 +74,23 @@ export const BingecatSyncModal: React.FC<BingecatSyncModalProps> = ({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error('Failed to export json', e);
+      setExportError(e instanceof Error ? e.message : 'Failed to export your watchlist.');
     } finally {
       setIsDownloading(false);
     }
   };
 
   const handleCopyJson = async () => {
+    setExportError(null);
     try {
-      const res = await fetch('/api/bingecat/export.json');
-      const data = await res.json();
+      const data = await fetchExport();
       if (navigator.clipboard) {
         navigator.clipboard.writeText(JSON.stringify(data, null, 2));
         setCopiedJson(true);
         setTimeout(() => setCopiedJson(false), 2200);
       }
     } catch (e) {
-      console.error('Failed to copy json', e);
+      setExportError(e instanceof Error ? e.message : 'Failed to copy your watchlist.');
     }
   };
 
@@ -257,6 +268,12 @@ export const BingecatSyncModal: React.FC<BingecatSyncModalProps> = ({
                   <span>{copiedJson ? 'Copied to Clipboard' : 'Copy JSON to Clipboard'}</span>
                 </button>
               </div>
+
+              {exportError && (
+                <p className="text-xs font-semibold text-rose-300 bg-rose-950/40 border border-rose-500/30 rounded-xl p-3">
+                  {exportError}
+                </p>
+              )}
             </div>
 
             <div className="p-3.5 rounded-2xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-400 space-y-1">
