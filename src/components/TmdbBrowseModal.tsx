@@ -50,6 +50,8 @@ export const TmdbBrowseModal: React.FC<TmdbBrowseModalProps> = ({
   const [needsToken, setNeedsToken] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [showTokenForm, setShowTokenForm] = useState(false);
+  const [hasStoredToken, setHasStoredToken] = useState(false);
+  const [serverConfigured, setServerConfigured] = useState(false);
   const [addToWatchlist, setAddToWatchlist] = useState(true);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [importedIds, setImportedIds] = useState<string[]>([]);
@@ -105,9 +107,11 @@ export const TmdbBrowseModal: React.FC<TmdbBrowseModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     setTokenInput(getStoredTmdbToken());
+    setHasStoredToken(Boolean(getStoredTmdbToken()));
     (async () => {
       try {
         const status = await fetchTmdbStatus();
+        setServerConfigured(status.configured);
         const hasToken = status.configured || Boolean(getStoredTmdbToken());
         setNeedsToken(!hasToken);
         setShowTokenForm(!hasToken);
@@ -125,10 +129,25 @@ export const TmdbBrowseModal: React.FC<TmdbBrowseModalProps> = ({
   const handleSaveToken = async (e: React.FormEvent) => {
     e.preventDefault();
     storeTmdbToken(tokenInput);
+    setHasStoredToken(Boolean(tokenInput.trim()));
     setNeedsToken(false);
     setShowTokenForm(false);
     setError(null);
     await (query.trim() ? runSearch(query, mediaFilter) : loadTrending(mediaFilter));
+  };
+
+  const handleClearToken = async () => {
+    storeTmdbToken('');
+    setTokenInput('');
+    setHasStoredToken(false);
+    setError(null);
+    setNeedsToken(!serverConfigured);
+    setShowTokenForm(!serverConfigured);
+    if (serverConfigured) {
+      await (query.trim() ? runSearch(query, mediaFilter) : loadTrending(mediaFilter));
+    } else {
+      setResults([]);
+    }
   };
 
   const handleSelectFilter = (filter: MediaFilter) => {
@@ -213,14 +232,33 @@ export const TmdbBrowseModal: React.FC<TmdbBrowseModalProps> = ({
                 Save
               </button>
             </div>
+            {hasStoredToken && (
+              <button
+                type="button"
+                onClick={() => void handleClearToken()}
+                className="text-[11px] text-zinc-400 hover:text-rose-300 underline underline-offset-2 cursor-pointer"
+              >
+                Clear saved key
+              </button>
+            )}
           </form>
         ) : (
-          <button
-            onClick={() => setShowTokenForm(true)}
-            className="text-[11px] text-zinc-400 hover:text-teal-300 underline underline-offset-2 cursor-pointer"
-          >
-            Change TMDB credential
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowTokenForm(true)}
+              className="text-[11px] text-zinc-400 hover:text-teal-300 underline underline-offset-2 cursor-pointer"
+            >
+              Change TMDB credential
+            </button>
+            {hasStoredToken && (
+              <button
+                onClick={() => void handleClearToken()}
+                className="text-[11px] text-zinc-400 hover:text-rose-300 underline underline-offset-2 cursor-pointer"
+              >
+                Clear saved key
+              </button>
+            )}
+          </div>
         )}
 
         {/* Search + filters */}

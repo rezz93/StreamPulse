@@ -43,7 +43,10 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
   // Reset tab when series changes
   useEffect(() => {
     if (series) {
-      setActiveTab(series.hasNewSeasonAlert || series.isUpcoming ? 'upcoming_intel' : 'seasons');
+      const isMovieTitle = series.mediaType === 'movie';
+      setActiveTab(
+        isMovieTitle ? 'cast' : series.hasNewSeasonAlert || series.isUpcoming ? 'upcoming_intel' : 'seasons'
+      );
       setAiIntel(null);
       setIntelError(null);
     }
@@ -61,6 +64,8 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
   }, [isOpen, onClose]);
 
   if (!isOpen || !series) return null;
+
+  const isMovie = series.mediaType === 'movie';
 
   const handleFetchAIIntel = async () => {
     setIsLoadingIntel(true);
@@ -148,13 +153,21 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                   <span>{series.rating.toFixed(1)} / 10</span>
                 </div>
-                <span className="font-semibold text-zinc-200">{series.firstAirYear}{series.lastAirYear ? `–${series.lastAirYear}` : '–Present'}</span>
+                <span className="font-semibold text-zinc-200">
+                  {isMovie
+                    ? series.firstAirYear
+                    : `${series.firstAirYear}${series.lastAirYear ? `–${series.lastAirYear}` : '–Present'}`}
+                </span>
                 <span>•</span>
                 <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-xs font-semibold text-zinc-300">
                   {series.contentRating}
                 </span>
-                <span>•</span>
-                <span>{series.totalSeasons} {series.totalSeasons === 1 ? 'Season' : 'Seasons'} ({series.totalEpisodes} eps)</span>
+                {!isMovie && (
+                  <>
+                    <span>•</span>
+                    <span>{series.totalSeasons} {series.totalSeasons === 1 ? 'Season' : 'Seasons'} ({series.totalEpisodes} eps)</span>
+                  </>
+                )}
                 {series.network && (
                   <>
                     <span>•</span>
@@ -184,6 +197,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
 
         {/* Modal Navigation Tabs */}
         <div className="flex border-b border-zinc-800 bg-zinc-950/60 px-4 sm:px-6">
+          {!isMovie && (
           <button
             id="tab-btn-upcoming-intel"
             onClick={() => setActiveTab('upcoming_intel')}
@@ -199,7 +213,9 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
             )}
           </button>
+          )}
 
+          {!isMovie && (
           <button
             id="tab-btn-seasons"
             onClick={() => setActiveTab('seasons')}
@@ -212,6 +228,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
             <Layers className="w-4 h-4" />
             <span>Seasons Guide ({series.seasons.length})</span>
           </button>
+          )}
 
           <button
             id="tab-btn-cast"
@@ -504,11 +521,17 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
               {/* Creators & Network */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-zinc-950/60 border border-zinc-800 p-4 rounded-xl">
-                  <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider block">Created By</span>
-                  <span className="text-sm font-bold text-zinc-100 mt-1 block">{series.creator || 'Showrunner / Creators'}</span>
+                  <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider block">
+                    {isMovie ? 'Directed By' : 'Created By'}
+                  </span>
+                  <span className="text-sm font-bold text-zinc-100 mt-1 block">
+                    {series.creator || (isMovie ? 'Director' : 'Showrunner / Creators')}
+                  </span>
                 </div>
                 <div className="bg-zinc-950/60 border border-zinc-800 p-4 rounded-xl">
-                  <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider block">Original Network / Studio</span>
+                  <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider block">
+                    {isMovie ? 'Studio' : 'Original Network / Studio'}
+                  </span>
                   <span className="text-sm font-bold text-zinc-100 mt-1 block">{series.network || series.primaryProvider}</span>
                 </div>
               </div>
