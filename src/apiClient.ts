@@ -1,8 +1,10 @@
 import { fetchTmdbTitle, resolveTmdbCredentials, searchTmdb, trendingTmdb, TmdbError, TmdbMediaType } from '../shared/tmdbService';
 import {
+  cleanTmdbListId,
   completeTmdbWriteAuth,
+  createTmdbList,
   startTmdbWriteAuth,
-  syncItemsToTmdbList,
+  syncItemsToTmdbLists,
   TmdbListSyncItem,
 } from '../shared/tmdbListSync';
 import { searchTvmazeShows } from '../shared/tvmazeService';
@@ -127,12 +129,20 @@ async function handleStatically(url: URL, init?: RequestInit): Promise<Response>
   if (pathname === '/api/tmdb/auth-complete' && method === 'POST') {
     const { accessToken, accountId } = await completeTmdbWriteAuth(body.readToken, body.requestToken);
     const items = (body.watchlistSeries ?? []) as TmdbListSyncItem[];
-    const sync = await syncItemsToTmdbList(body.listId, accessToken, items);
+    const sync = await syncItemsToTmdbLists(body.listId, body.movieListId, accessToken, items);
     return json({ success: true, userAccessToken: accessToken, accountId, ...sync });
   }
   if (pathname === '/api/tmdb/sync-to-list' && method === 'POST') {
     const items = (body.watchlistSeries ?? []) as TmdbListSyncItem[];
-    return json({ success: true, ...(await syncItemsToTmdbList(body.listId, body.apiKey, items)) });
+    return json({
+      success: true,
+      listId: cleanTmdbListId(body.listId),
+      ...(await syncItemsToTmdbLists(body.listId, body.movieListId, body.apiKey, items)),
+    });
+  }
+  if (pathname === '/api/tmdb/create-list' && method === 'POST') {
+    const listId = await createTmdbList(body.writeToken, body.name, body.description);
+    return json({ success: true, listId });
   }
 
   if (pathname === '/api/series/ai-season-intel') return unavailable('AI season intelligence');
