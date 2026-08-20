@@ -81,15 +81,14 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
         }),
       });
 
+      const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error('Failed to generate season intelligence');
+        throw new Error(payload.error || 'Failed to generate season intelligence');
       }
 
-      const data: AISeasonIntel = await response.json();
-      setAiIntel(data);
+      setAiIntel(payload as AISeasonIntel);
     } catch (err: any) {
-      console.error(err);
-      setIntelError('Could not retrieve AI season intelligence at this time.');
+      setIntelError(err?.message || 'Could not retrieve AI season intelligence at this time.');
     } finally {
       setIsLoadingIntel(false);
     }
