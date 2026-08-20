@@ -20,10 +20,13 @@ import {
 import { Series } from '../types';
 import { getStoredTmdbToken, storeTmdbToken } from '../tmdbToken';
 import {
+  clearPendingTmdbRequestToken,
   clearTmdbWriteToken,
+  getPendingTmdbRequestToken,
   getTmdbListId,
   getTmdbMovieListId,
   getTmdbWriteToken,
+  savePendingTmdbRequestToken,
   saveTmdbListSettings,
   saveTmdbWriteToken,
 } from '../tmdbSettings';
@@ -51,7 +54,8 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
   const [tmdbApiKey, setTmdbApiKey] = useState<string>(() => {
     return localStorage.getItem('streampulse_tmdb_api_key') || getStoredTmdbToken();
   });
-  const [pendingRequestToken, setPendingRequestToken] = useState<string>('');
+  const [pendingRequestToken, setPendingRequestToken] = useState<string>(() => getPendingTmdbRequestToken());
+  const [writeToken, setWriteToken] = useState<string>(() => getTmdbWriteToken());
   const [isAuthorizing, setIsAuthorizing] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'sync' | 'nuvio' | 'shows'>('sync');
 
@@ -100,6 +104,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
       });
       const data = await res.json();
       if (res.ok && data.request_token && data.authUrl) {
+        savePendingTmdbRequestToken(data.request_token);
         setPendingRequestToken(data.request_token);
         // Open TMDB Approval page in new tab
         window.open(data.authUrl, '_blank', 'noopener,noreferrer');
@@ -154,7 +159,9 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
       if (res.ok && data.success) {
         if (data.userAccessToken) {
           saveTmdbWriteToken(data.userAccessToken);
+          setWriteToken(data.userAccessToken);
         }
+        clearPendingTmdbRequestToken();
         setPendingRequestToken('');
         setSyncStatus({
           success: true,
@@ -229,7 +236,10 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
         });
       } else {
         // A rejected token usually means the approval expired: re-run the 1-click flow.
-        if (res.status === 401 || res.status === 403) clearTmdbWriteToken();
+        if (res.status === 401 || res.status === 403) {
+          clearTmdbWriteToken();
+          setWriteToken('');
+        }
         setSyncStatus({
           success: false,
           message: data.error || 'Write authorization needed from TMDB. Click "1-Click TMDB Authorize" below.',
@@ -440,6 +450,54 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
                   onChange={(e) => setTmdbApiKey(e.target.value)}
                   className="w-full bg-zinc-900 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-500 focus:outline-hidden focus:border-teal-500 transition-all font-mono"
                 />
+                <p className="text-[11px] text-zinc-400 mt-1">
+                  This token only reads. Writing to a list needs the user access token from the authorize step below.
+                </p>
+              </div>
+
+              {/* Write access status: the read token alone can never write. */}
+              <div
+                className={`p-3 rounded-xl border text-xs flex flex-wrap items-center gap-2 ${
+                  writeToken
+                    ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300'
+                    : 'bg-zinc-900/80 border-zinc-700 text-zinc-300'
+                }`}
+              >
+                {writeToken ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span className="font-bold">TMDB write access granted</span>
+                    <code className="font-mono text-[10px] text-emerald-200/80 bg-emerald-950/60 rounded px-1.5 py-0.5">
+                      {`${writeToken.slice(0, 12)}…${writeToken.slice(-6)}`}
+                    </code>
+                    <button
+                      onClick={() => handleCopy(writeToken, 'write-token')}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[11px] font-semibold border border-zinc-700 transition-colors cursor-pointer"
+                    >
+                      {copiedUrl === 'write-token' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedUrl === 'write-token' ? 'Copied' : 'Copy user access token'}</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        clearTmdbWriteToken();
+                        setWriteToken('');
+                      }}
+                      className="ml-auto px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-semibold border border-zinc-700 transition-colors cursor-pointer"
+                    >
+                      Revoke locally
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-3.5 h-3.5 text-indigo-300 shrink-0" />
+                    <span className="font-bold">No TMDB write access yet</span>
+                    <span className="text-zinc-400">
+                      {pendingRequestToken
+                        ? 'Approved on TMDB? Click "Complete Sync" to finish and store your user access token.'
+                        : 'Click "1-Click TMDB Authorize", approve on TMDB, then click "Complete Sync".'}
+                    </span>
+                  </>
+                )}
               </div>
 
               {/* Sync Actions */}
