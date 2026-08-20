@@ -1,0 +1,654 @@
+import express, { Request, Response } from "express";
+import path from "path";
+import { createServer as createViteServer } from "vite";
+import { INITIAL_SERIES_DATABASE, PROVIDERS } from "./server/seriesData";
+import { fetchAISeasonIntelligence } from "./server/geminiService";
+import { getAddonManifest, seriesToMetaItem, seriesToFullMeta, IMDB_MAPPING } from "./server/bingecatAddon";
+import { Series, StreamingProviderId } from "./src/types";
+
+let seriesDatabase: Series[] = INITIAL_SERIES_DATABASE.map(s => {
+  const mapping = IMDB_MAPPING[s.id];
+  return {
+    ...s,
+    imdbId: mapping?.imdbId,
+    tmdbId: mapping?.tmdbId
+  };
+});
+let currentServerWatchlist: string[] = ['severance', 'the-last-of-us', 'stranger-things', 'the-bear', 'house-of-the-dragon', 'shogun'];
+
+async function startServer() {
+  const app = express();
+  const PORT = 3000;
+
+  app.use(express.json());
+
+  // Universal CORS for Bingecat, Stremio, and web clients
+  app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    if (req.method === "OPTIONS") {
+      res.sendStatus(200);
+      return;
+    }
+    next();
+  });
+
+  // --- API Endpoints ---
+  app.get("/api/health", (_req: Request, res: Response) => {
+    res.json({ status: "ok", count: seriesDatabase.length });
+  });
+
+  // Providers list
+  app.get("/api/providers", (_req: Request, res: Response) => {
+    res.json(PROVIDERS);
+  });
+
+  // Series catalog with rich filtering
+  app.get("/api/series", (req: Request, res: Response) => {
+    const { category, provider, genre, decade, search, sortBy, statusFilter } = req.query;
+
+    let filtered = [...seriesDatabase];
+
+    // Filter by Category
+    if (category && typeof category === 'string' && category !== 'all') {
+      if (category === 'now_playing') {
+        filtered = filtered.filter(s => s.isNowPlaying);
+      } else if (category === 'upcoming') {
+        filtered = filtered.filter(s => s.isUpcoming || (s.nextSeasonDaysLeft !== undefined && s.nextSeasonDaysLeft > 0 && s.nextSeasonDaysLeft <= 180));
+      } else if (category === 'new_seasons') {
+        filtered = filtered.filter(s => s.hasNewSeasonAlert || ['season_upcoming', 'renewed', 'in_production', 'final_season_upcoming'].includes(s.renewalState));
+      } else if (category === 'classics') {
+        filtered = filtered.filter(s => s.isClassic || s.status === 'Ended' || s.firstAirYear < 2020);
+      }
+    }
+
+    // Filter by Provider
+    if (provider && typeof provider === 'string' && provider !== 'all') {
+      filtered = filtered.filter(s => s.providers.includes(provider as StreamingProviderId));
+    }
+
+    // Filter by Genre
+    if (genre && typeof genre === 'string' && genre !== 'all') {
+      filtered = filtered.filter(s => s.genres.some(g => g.toLowerCase().includes((genre as string).toLowerCase())));
+    }
+
+    // Filter by Decade
+    if (decade && typeof decade === 'string' && decade !== 'all') {
+      filtered = filtered.filter(s => s.decade === decade);
+    }
+
+    // Filter by Status
+    if (statusFilter && typeof statusFilter === 'string' && statusFilter !== 'all') {
+      if (statusFilter === 'renewed') {
+        filtered = filtered.filter(s => s.renewalState === 'renewed' || s.renewalState === 'in_production');
+      } else if (statusFilter === 'upcoming') {
+        filtered = filtered.filter(s => s.renewalState === 'season_upcoming' || s.renewalState === 'final_season_upcoming' || s.isUpcoming);
+      } else if (statusFilter === 'airing') {
+        filtered = filtered.filter(s => s.isNowPlaying || s.renewalState === 'airing_now');
+      } else if (statusFilter === 'concluded') {
+        filtered = filtered.filter(s => s.status === 'Ended' || s.renewalState === 'concluded');
+      }
+    }
+
+    // Search query
+    if (search && typeof search === 'string' && search.trim() !== '') {
+      const q = search.toLowerCase().trim();
+      filtered = filtered.filter(s => 
+        s.title.toLowerCase().includes(q) ||
+        s.synopsis.toLowerCase().includes(q) ||
+        s.genres.some(g => g.toLowerCase().includes(q)) ||
+        s.cast.some(c => c.name.toLowerCase().includes(q)) ||
+        s.renewalBadgeText.toLowerCase().includes(q) ||
+        (s.network && s.network.toLowerCase().includes(q))
+      );
+    }
+
+    // Sorting
+    if (sortBy === 'rating') {
+      filtered.sort((a, b) => b.rating - a.rating);
+    } else if (sortBy === 'countdown') {
+      filtered.sort((a, b) => (a.nextSeasonDaysLeft ?? 9999) - (b.nextSeasonDaysLeft ?? 9999));
+    } else if (sortBy === 'releaseDate') {
+      filtered.sort((a, b) => b.firstAirYear - a.firstAirYear);
+    } else if (sortBy === 'title') {
+      filtered.sort((a, b) => a.title.localeCompare(b.title));
+    } else {
+      // Default: popularity / featured
+      filtered.sort((a, b) => {
+        if (a.hasNewSeasonAlert && !b.hasNewSeasonAlert) return -1;
+        if (!a.hasNewSeasonAlert && b.hasNewSeasonAlert) return 1;
+        return b.rating - a.rating;
+      });
+    }
+
+    res.json({
+      total: filtered.length,
+      series: filtered
+    });
+  });
+
+  // Series single item details
+  app.get("/api/series/detail/:id", (req: Request, res: Response) => {
+    const item = seriesDatabase.find(s => s.id === req.params.id);
+    if (!item) {
+      res.status(404).json({ error: "Series not found" });
+      return;
+    }
+    res.json(item);
+  });
+
+  // Live TV search via TVMaze API proxy (to support looking up ANY show on the planet)
+  app.get("/api/series/live-search", async (req: Request, res: Response) => {
+    const query = req.query.q as string;
+    if (!query || query.trim().length === 0) {
+      res.json({ results: [] });
+      return;
+    }
+
+    try {
+      const response = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(query)}`);
+      if (!response.ok) {
+        throw new Error(`TVMaze API returned status ${response.status}`);
+      }
+      const data = await response.json() as Array<{ show: any }>;
+
+      // Map TVMaze results into our Series model
+      const results: Series[] = data.slice(0, 10).map(({ show }) => {
+        const networkName = show.webChannel?.name || show.network?.name || 'Streaming';
+        let matchedProvider: StreamingProviderId = 'netflix';
+        const netLower = networkName.toLowerCase();
+        if (netLower.includes('apple')) matchedProvider = 'appletv';
+        else if (netLower.includes('hbo') || netLower.includes('max')) matchedProvider = 'max';
+        else if (netLower.includes('amazon') || netLower.includes('prime')) matchedProvider = 'prime';
+        else if (netLower.includes('disney')) matchedProvider = 'disney';
+        else if (netLower.includes('hulu')) matchedProvider = 'hulu';
+        else if (netLower.includes('paramount') || netLower.includes('cbs') || netLower.includes('showtime')) matchedProvider = 'paramount';
+        else if (netLower.includes('peacock') || netLower.includes('nbc')) matchedProvider = 'peacock';
+
+        const premiereYear = show.premiered ? parseInt(show.premiered.slice(0, 4), 10) : 2024;
+        let decade: '70s' | '80s' | '90s' | '2000s' | '2010s' | '2020s' = '2020s';
+        if (premiereYear < 1980) decade = '70s';
+        else if (premiereYear < 1990) decade = '80s';
+        else if (premiereYear < 2000) decade = '90s';
+        else if (premiereYear < 2010) decade = '2000s';
+        else if (premiereYear < 2020) decade = '2010s';
+
+        const isEnded = show.status === 'Ended';
+
+        return {
+          id: `tvm-${show.id}`,
+          title: show.name,
+          tagline: show.type || 'Television Series',
+          synopsis: show.summary ? show.summary.replace(/<[^>]*>?/gm, '') : 'No overview available.',
+          posterUrl: show.image?.original || show.image?.medium || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80',
+          backdropUrl: show.image?.original || 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1600&auto=format&fit=crop&q=80',
+          providers: [matchedProvider],
+          primaryProvider: matchedProvider,
+          genres: show.genres?.length ? show.genres : ['Drama'],
+          rating: show.rating?.average ? Number(show.rating.average) : 7.5,
+          ratingCount: 'Verified TV Guide',
+          contentRating: 'TV-14',
+          firstAirYear: premiereYear,
+          decade: decade,
+          totalSeasons: 1,
+          totalEpisodes: 10,
+          status: isEnded ? 'Ended' : 'Returning Series',
+          isNowPlaying: !isEnded,
+          isUpcoming: false,
+          isClassic: premiereYear < 2018 || isEnded,
+          hasNewSeasonAlert: !isEnded,
+          renewalState: isEnded ? 'concluded' : 'renewed',
+          renewalBadgeText: isEnded ? 'Ended / Complete Series' : 'Active / Returning Broadcast',
+          network: networkName,
+          cast: [],
+          seasons: [
+            {
+              seasonNumber: 1,
+              title: 'Season 1',
+              episodeCount: 8,
+              releaseDate: show.premiered || '2024-01-01',
+              status: isEnded ? 'released' : 'airing',
+              overview: 'Season episodes and broadcast schedule.'
+            }
+          ]
+        };
+      });
+
+      res.json({ results });
+    } catch (err: any) {
+      console.error("TVMaze proxy error:", err);
+      res.status(500).json({ error: "Failed to fetch live show data" });
+    }
+  });
+
+  // AI Season Intelligence Endpoint (Gemini)
+  app.post("/api/series/ai-season-intel", async (req: Request, res: Response) => {
+    try {
+      const { title, context } = req.body;
+      if (!title || typeof title !== 'string') {
+        res.status(400).json({ error: "Show title is required" });
+        return;
+      }
+
+      const intel = await fetchAISeasonIntelligence(title, context);
+      res.json(intel);
+    } catch (error: any) {
+      console.error("AI Season Intel route error:", error);
+      res.status(500).json({ error: "Failed to process season intelligence" });
+    }
+  });
+
+  // ==========================================
+  // --- TMDB DIRECT INTEGRATION ENDPOINTS ----
+  // ==========================================
+
+  // Step 1: Request TMDB write-permission token
+  app.post("/api/tmdb/auth-start", async (req: Request, res: Response) => {
+    try {
+      const { readToken } = req.body;
+      if (!readToken) {
+        res.status(400).json({ error: "TMDB Read Access Token is required." });
+        return;
+      }
+
+      const response = await fetch("https://api.themoviedb.org/4/auth/request_token", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${String(readToken).trim()}`,
+          "Content-Type": "application/json;charset=utf-8"
+        },
+        body: JSON.stringify({
+          redirect_to: "https://www.themoviedb.org"
+        })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.request_token) {
+        res.json({
+          success: true,
+          request_token: data.request_token,
+          authUrl: `https://www.themoviedb.org/auth/access?request_token=${data.request_token}`
+        });
+      } else {
+        res.status(400).json({
+          error: data.status_message || "Failed to create TMDB request token."
+        });
+      }
+    } catch (err: any) {
+      console.error("TMDB Auth start error:", err);
+      res.status(500).json({ error: err.message || "Failed to contact TMDB." });
+    }
+  });
+
+  // Step 2: Exchange approved request_token for Write Access Token & Sync
+  app.post("/api/tmdb/auth-complete", async (req: Request, res: Response) => {
+    try {
+      const { readToken, requestToken, listId, watchlistSeries } = req.body;
+      if (!readToken || !requestToken) {
+        res.status(400).json({ error: "Missing read token or request token." });
+        return;
+      }
+
+      const cleanListId = String(listId || "").replace(/[^0-9]/g, "");
+      if (!cleanListId) {
+        res.status(400).json({ error: "Numeric TMDB List ID is required." });
+        return;
+      }
+
+      // Exchange request token for access token
+      const accessRes = await fetch("https://api.themoviedb.org/4/auth/access_token", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${String(readToken).trim()}`,
+          "Content-Type": "application/json;charset=utf-8"
+        },
+        body: JSON.stringify({ request_token: requestToken })
+      });
+
+      const accessData = await accessRes.json();
+      if (!accessRes.ok || !accessData.access_token) {
+        res.status(400).json({
+          error: accessData.status_message || "Approval pending. Please make sure you clicked 'Approve' on the TMDB page first, then try again."
+        });
+        return;
+      }
+
+      const userAccessToken = accessData.access_token;
+      const accountId = accessData.account_id;
+
+      // Sync items with the newly authorized user access token
+      const itemsToAdd = (Array.isArray(watchlistSeries) ? watchlistSeries : [])
+        .map((item: any) => ({
+          title: item.title,
+          tmdbId: item.tmdbId || IMDB_MAPPING[item.id]?.tmdbId
+        }))
+        .filter((item: any) => Boolean(item.tmdbId));
+
+      if (itemsToAdd.length === 0) {
+        res.json({
+          success: true,
+          userAccessToken,
+          accountId,
+          syncedCount: 0,
+          message: "TMDB Write Authorization granted successfully!"
+        });
+        return;
+      }
+
+      const syncRes = await fetch(`https://api.themoviedb.org/4/list/${cleanListId}/items`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${userAccessToken}`,
+          "Content-Type": "application/json;charset=utf-8"
+        },
+        body: JSON.stringify({
+          items: itemsToAdd.map(it => ({
+            media_type: "tv",
+            media_id: it.tmdbId
+          }))
+        })
+      });
+
+      const syncData = await syncRes.json();
+      if (syncRes.ok && syncData.success !== false) {
+        res.json({
+          success: true,
+          userAccessToken,
+          accountId,
+          syncedCount: itemsToAdd.length,
+          message: `Authorization approved! Successfully synced ${itemsToAdd.length} shows directly to TMDB List #${cleanListId}!`
+        });
+      } else {
+        res.json({
+          success: true,
+          userAccessToken,
+          accountId,
+          warning: syncData.status_message,
+          message: `Authorization approved! You can now sync to List #${cleanListId}.`
+        });
+      }
+    } catch (err: any) {
+      console.error("TMDB Auth complete error:", err);
+      res.status(500).json({ error: err.message || "Failed to complete TMDB authorization." });
+    }
+  });
+
+  app.post("/api/tmdb/sync-to-list", async (req: Request, res: Response) => {
+    try {
+      const { listId, apiKey, watchlistSeries } = req.body;
+      if (!listId) {
+        res.status(400).json({ error: "TMDB List ID is required" });
+        return;
+      }
+
+      // Clean listId: extract digits from full URL or slug
+      const cleanListId = String(listId).replace(/[^0-9]/g, '');
+      if (!cleanListId) {
+        res.status(400).json({ error: "Could not extract a valid numeric TMDB List ID." });
+        return;
+      }
+
+      const token = apiKey ? String(apiKey).trim() : '';
+
+      if (!token) {
+        // No token provided: return prepared items with helpful guidance
+        res.json({
+          success: true,
+          syncedCount: Array.isArray(watchlistSeries) ? watchlistSeries.length : 0,
+          message: `Watchlist prepared for TMDB List #${cleanListId}. You can add them with 1-click or paste your TMDB Read Access Token.`
+        });
+        return;
+      }
+
+      const itemsToAdd = (Array.isArray(watchlistSeries) ? watchlistSeries : [])
+        .map(item => ({
+          title: item.title,
+          tmdbId: item.tmdbId || IMDB_MAPPING[item.id]?.tmdbId
+        }))
+        .filter(item => Boolean(item.tmdbId));
+
+      if (itemsToAdd.length === 0) {
+        res.status(400).json({ error: "No valid TMDB show IDs found in your watchlist." });
+        return;
+      }
+
+      // 1. Try TMDB v4 batch list items endpoint (Standard for TMDB API Read Access Tokens)
+      const isBearerToken = token.length > 50 || token.startsWith('eyJ');
+      const authHeader = isBearerToken ? `Bearer ${token}` : `Bearer ${token}`;
+
+      let v4Success = false;
+      let v4Data: any = null;
+
+      try {
+        const v4Payload = {
+          items: itemsToAdd.map(it => ({
+            media_type: 'tv',
+            media_id: it.tmdbId
+          }))
+        };
+
+        const v4Res = await fetch(`https://api.themoviedb.org/4/list/${cleanListId}/items`, {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/json;charset=utf-8'
+          },
+          body: JSON.stringify(v4Payload)
+        });
+
+        v4Data = await v4Res.json();
+        if (v4Res.ok && (v4Data.success !== false)) {
+          v4Success = true;
+          res.json({
+            success: true,
+            syncedCount: itemsToAdd.length,
+            message: `Successfully synced ${itemsToAdd.length} shows to TMDB List #${cleanListId}!`
+          });
+          return;
+        }
+      } catch (err) {
+        console.log("TMDB v4 batch attempt error:", err);
+      }
+
+      // 2. Try TMDB v3 individual add_item endpoint
+      let v3SuccessCount = 0;
+      let lastV3Error = '';
+
+      for (const item of itemsToAdd) {
+        try {
+          const v3Url = token.length === 32 
+            ? `https://api.themoviedb.org/3/list/${cleanListId}/add_item?api_key=${token}`
+            : `https://api.themoviedb.org/3/list/${cleanListId}/add_item`;
+
+          const v3Res = await fetch(v3Url, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json;charset=utf-8'
+            },
+            body: JSON.stringify({ media_id: item.tmdbId })
+          });
+
+          const v3Data = await v3Res.json();
+          if (v3Res.ok && v3Data.status_code === 12 || v3Data.success) {
+            v3SuccessCount++;
+          } else {
+            lastV3Error = v3Data.status_message || v3Data.error || `HTTP ${v3Res.status}`;
+          }
+        } catch (err: any) {
+          lastV3Error = err.message;
+        }
+      }
+
+      if (v3SuccessCount > 0) {
+        res.json({
+          success: true,
+          syncedCount: v3SuccessCount,
+          message: `Successfully added ${v3SuccessCount} of ${itemsToAdd.length} shows to TMDB List #${cleanListId}!`
+        });
+        return;
+      }
+
+      // If both API calls failed, give exact diagnostic explanation
+      const diagnostic = (v4Data && v4Data.status_message) 
+        ? v4Data.status_message 
+        : (lastV3Error || "TMDB API authentication was rejected. TMDB lists require an API Read Access Token (from themoviedb.org/settings/api).");
+
+      res.status(400).json({
+        error: diagnostic,
+        requiresToken: true,
+        items: itemsToAdd
+      });
+
+    } catch (err: any) {
+      console.error("TMDB Sync error:", err);
+      res.status(500).json({ error: `Server error: ${err.message || 'Could not connect to TMDB'}` });
+    }
+  });
+
+  // ==========================================
+  // --- BINGECAT & STREMIO ADDON ENDPOINTS ---
+  // ==========================================
+
+  // Watchlist Sync endpoint (keeps server in sync with user's frontend watchlist)
+  app.get("/api/watchlist/sync", (_req: Request, res: Response) => {
+    res.json({ watchlist: currentServerWatchlist });
+  });
+
+  app.post("/api/watchlist/sync", (req: Request, res: Response) => {
+    const { watchlist } = req.body;
+    if (Array.isArray(watchlist)) {
+      currentServerWatchlist = watchlist;
+      res.json({ success: true, count: currentServerWatchlist.length });
+    } else {
+      res.status(400).json({ error: "Invalid watchlist array" });
+    }
+  });
+
+  // Bingecat-formatted JSON list export (for "My Lists" / "Collections")
+  app.get("/api/bingecat/export.json", (_req: Request, res: Response) => {
+    const watchlistedSeries = seriesDatabase.filter(s => currentServerWatchlist.includes(s.id));
+    const exportData = {
+      name: "StreamPulse Watchlist & Season Premieres",
+      description: "Synchronized from StreamPulse series tracker",
+      updatedAt: new Date().toISOString(),
+      itemCount: watchlistedSeries.length,
+      items: watchlistedSeries.map(s => {
+        const mapping = IMDB_MAPPING[s.id];
+        return {
+          title: s.title,
+          year: s.firstAirYear,
+          imdbId: mapping?.imdbId || null,
+          tmdbId: mapping?.tmdbId || null,
+          provider: s.primaryProvider,
+          network: s.network,
+          rating: s.rating,
+          status: s.status,
+          renewalState: s.renewalState,
+          renewalBadgeText: s.renewalBadgeText,
+          nextSeasonReleaseDate: s.nextSeasonReleaseDate || null,
+          genres: s.genres,
+          overview: s.synopsis
+        };
+      })
+    };
+    res.setHeader("Content-Disposition", 'attachment; filename="streampulse-bingecat-watchlist.json"');
+    res.json(exportData);
+  });
+
+  // 1. Addon Manifest
+  const handleManifest = (req: Request, res: Response) => {
+    const host = req.get('host') || 'localhost:3000';
+    const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+    const baseUrl = `${protocol}://${host}`;
+    res.json(getAddonManifest(baseUrl));
+  };
+
+  app.get("/bingecat/manifest.json", handleManifest);
+  app.get("/stremio/manifest.json", handleManifest);
+  app.get("/addon/manifest.json", handleManifest);
+  app.get("/manifest.json", handleManifest);
+
+  // 2. Addon Catalog Endpoint
+  const handleCatalog = (req: Request, res: Response) => {
+    const { catalogId } = req.params;
+    const queryWatchlist = req.query.watchlist as string;
+    
+    let activeWatchlist = currentServerWatchlist;
+    if (queryWatchlist) {
+      activeWatchlist = queryWatchlist.split(',').map(s => s.trim());
+    }
+
+    let items: Series[] = [];
+
+    if (catalogId === 'streampulse_watchlist') {
+      items = seriesDatabase.filter(s => activeWatchlist.includes(s.id));
+      if (items.length === 0) {
+        // Fallback to top featured if empty
+        items = seriesDatabase.slice(0, 6);
+      }
+    } else if (catalogId === 'streampulse_upcoming') {
+      items = seriesDatabase.filter(s => s.isUpcoming || (s.nextSeasonDaysLeft !== undefined && s.nextSeasonDaysLeft > 0 && s.nextSeasonDaysLeft <= 180));
+    } else if (catalogId === 'streampulse_renewals') {
+      items = seriesDatabase.filter(s => s.hasNewSeasonAlert || ['season_upcoming', 'renewed', 'in_production', 'final_season_upcoming'].includes(s.renewalState));
+    } else {
+      // streampulse_trending
+      items = [...seriesDatabase].sort((a, b) => b.rating - a.rating).slice(0, 15);
+    }
+
+    const metas = items.map(seriesToMetaItem);
+    res.json({ metas });
+  };
+
+  app.get("/bingecat/catalog/series/:catalogId.json", handleCatalog);
+  app.get("/bingecat/catalog/series/:catalogId/:extra.json", handleCatalog);
+  app.get("/stremio/catalog/series/:catalogId.json", handleCatalog);
+  app.get("/stremio/catalog/series/:catalogId/:extra.json", handleCatalog);
+  app.get("/catalog/series/:catalogId.json", handleCatalog);
+  app.get("/catalog/series/:catalogId/:extra.json", handleCatalog);
+
+  // 3. Addon Meta Endpoint
+  const handleMeta = (req: Request, res: Response) => {
+    const { id } = req.params;
+    // Look up by IMDb ID or streampulse ID
+    let found = seriesDatabase.find(s => {
+      const mapping = IMDB_MAPPING[s.id];
+      return mapping?.imdbId === id || `streampulse:${s.id}` === id || s.id === id;
+    });
+
+    if (!found) {
+      res.status(404).json({ error: "Series metadata not found" });
+      return;
+    }
+
+    res.json({ meta: seriesToFullMeta(found) });
+  };
+
+  app.get("/bingecat/meta/series/:id.json", handleMeta);
+  app.get("/stremio/meta/series/:id.json", handleMeta);
+  app.get("/meta/series/:id.json", handleMeta);
+
+  // --- Vite Middleware ---
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    app.get("*", (_req: Request, res: Response) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`StreamPulse Server running on http://localhost:${PORT}`);
+  });
+}
+
+startServer().catch(err => {
+  console.error("Failed to start server:", err);
+});

@@ -1,0 +1,25 @@
+{
+  "name": "StreamPulse - Streaming Series & New Seasons Tracker",
+  "short_name": "StreamPulse",
+  "description": "Explore and track streaming series across Netflix, Apple TV+, Max, Prime Video, and Disney+ with upcoming season countdowns and renewal radar.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#09090b",
+  "theme_color": "#4f46e5",
+  "categories": ["entertainment", "video", "news"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "StreamPulse - Streaming Series & New Season Tracker",
+  "description": "Explore and track TV series across Netflix, Apple TV+, Max, Prime Video, and Disney+, with upcoming season countdowns, renewal intelligence, and classic archives.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
