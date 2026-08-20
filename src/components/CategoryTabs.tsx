@@ -28,6 +28,13 @@ export const CategoryTabs: React.FC<CategoryTabsProps> = ({
     badgeHighlight?: boolean;
   }> = [
     {
+      id: 'watchlist',
+      label: 'My Watchlist',
+      description: 'Tracked shows & season alerts',
+      icon: Bookmark,
+      badge: watchlistCount > 0 ? watchlistCount : undefined,
+    },
+    {
       id: 'now_playing',
       label: 'Now Streaming',
       description: 'Active & trending seasons',
@@ -60,13 +67,6 @@ export const CategoryTabs: React.FC<CategoryTabsProps> = ({
       label: 'Classic & Older Series',
       description: 'By decade (80s, 90s, 00s, 10s)',
       icon: Archive,
-    },
-    {
-      id: 'watchlist',
-      label: 'My Watchlist',
-      description: 'Tracked shows & season alerts',
-      icon: Bookmark,
-      badge: watchlistCount > 0 ? watchlistCount : undefined,
     },
   ];
 
