@@ -18,6 +18,7 @@ import {
   cleanTmdbListId,
   completeTmdbWriteAuth,
   createTmdbList,
+  removeItemsFromTmdbLists,
   startTmdbWriteAuth,
   syncItemsToTmdbLists,
   TmdbListSyncItem,
@@ -409,6 +410,21 @@ async function startServer() {
         withKnownTmdbIds(watchlistSeries)
       );
       res.json({ success: true, listId: cleanTmdbListId(listId), ...sync });
+    } catch (err) {
+      sendTmdbError(res, err);
+    }
+  });
+
+  app.post("/api/tmdb/remove-from-list", async (req: Request, res: Response) => {
+    try {
+      const { listId, movieListId, apiKey, items, watchlistSeries } = req.body;
+      const removal = await removeItemsFromTmdbLists(
+        listId,
+        movieListId,
+        String(apiKey ?? ""),
+        withKnownTmdbIds(items ?? watchlistSeries)
+      );
+      res.json({ success: true, ...removal });
     } catch (err) {
       sendTmdbError(res, err);
     }

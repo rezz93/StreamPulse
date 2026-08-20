@@ -1,25 +1,29 @@
 import React from 'react';
 import { Series } from '../types';
 import { SeriesCard } from './SeriesCard';
-import { Bookmark, Sparkles, Bell, ArrowRight, Puzzle, RefreshCw } from 'lucide-react';
+import { Bookmark, Bell, ArrowRight, RefreshCw, SlidersHorizontal } from 'lucide-react';
 
 interface WatchlistViewProps {
   watchlistedSeries: Series[];
   watchlistIds: string[];
+  totalWatchlistCount: number;
+  hasActiveFilters: boolean;
   onToggleWatchlist: (id: string, e: React.MouseEvent) => void;
   onSelectSeries: (series: Series) => void;
   onBrowseMore: () => void;
-  onOpenBingecatModal?: () => void;
+  onClearFilters: () => void;
   onOpenTmdbModal?: () => void;
 }
 
 export const WatchlistView: React.FC<WatchlistViewProps> = ({
   watchlistedSeries,
   watchlistIds,
+  totalWatchlistCount,
+  hasActiveFilters,
   onToggleWatchlist,
   onSelectSeries,
   onBrowseMore,
-  onOpenBingecatModal,
+  onClearFilters,
   onOpenTmdbModal,
 }) => {
   const showsWithNewSeasons = watchlistedSeries.filter(
@@ -46,15 +50,6 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
                   <span>Sync with TMDB</span>
                 </button>
               )}
-              {onOpenBingecatModal && (
-                <button
-                  onClick={onOpenBingecatModal}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold transition-all cursor-pointer"
-                >
-                  <Puzzle className="w-3 h-3" />
-                  <span>Sync to Bingecat</span>
-                </button>
-              )}
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
               My Watchlist & Season Alerts
@@ -66,7 +61,7 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
 
           <div className="flex items-center gap-3">
             <div className="bg-zinc-950/80 border border-amber-500/30 px-4 py-3 rounded-2xl text-center">
-              <div className="text-2xl font-black text-amber-300">{watchlistedSeries.length}</div>
+              <div className="text-2xl font-black text-amber-300">{totalWatchlistCount}</div>
               <div className="text-[11px] font-semibold text-zinc-400 mt-0.5">Saved Series</div>
             </div>
             {showsWithNewSeasons.length > 0 && (
@@ -102,6 +97,24 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
               />
             ))}
           </div>
+        </div>
+      ) : totalWatchlistCount > 0 && hasActiveFilters ? (
+        <div className="p-12 text-center bg-zinc-900/40 rounded-3xl border border-zinc-800 space-y-4 max-w-lg mx-auto">
+          <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center mx-auto text-zinc-400">
+            <SlidersHorizontal className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-white">No Saved Titles Match These Filters</h3>
+            <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">
+              Your watchlist has {totalWatchlistCount} saved {totalWatchlistCount === 1 ? 'title' : 'titles'}, but none match the current provider, genre, or search filters.
+            </p>
+          </div>
+          <button
+            onClick={onClearFilters}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all cursor-pointer shadow-md"
+          >
+            <span>Clear Filters</span>
+          </button>
         </div>
       ) : (
         <div className="p-12 text-center bg-zinc-900/40 rounded-3xl border border-zinc-800 space-y-4 max-w-lg mx-auto">

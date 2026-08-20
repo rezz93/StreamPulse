@@ -17,9 +17,15 @@ import { UpcomingTimelineView } from './components/UpcomingTimelineView';
 import { WatchlistView } from './components/WatchlistView';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { AndroidPwaModal } from './components/AndroidPwaModal';
-import { BingecatSyncModal } from './components/BingecatSyncModal';
 import { TmdbSyncModal } from './components/TmdbSyncModal';
 import { TmdbBrowseModal } from './components/TmdbBrowseModal';
+import { cleanTmdbListId } from '../shared/tmdbListSync';
+import {
+  clearTmdbWriteToken,
+  getTmdbListId,
+  getTmdbMovieListId,
+  getTmdbWriteToken,
+} from './tmdbSettings';
 import {
   SlidersHorizontal,
   Flame,
@@ -31,20 +37,6 @@ import {
   Info,
   Calendar,
 } from 'lucide-react';
-
-const GENRE_LIST = [
-  'All Genres',
-  'Sci-Fi',
-  'Drama',
-  'Thriller',
-  'Dark Comedy',
-  'Crime',
-  'Mystery',
-  'Fantasy',
-  'Action',
-  'Historical',
-  'Espionage',
-];
 
 export default function App() {
   const [seriesList, setSeriesList] = useState<Series[]>([]);
@@ -63,9 +55,9 @@ export default function App() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState<boolean>(false);
   const [isAndroidModalOpen, setIsAndroidModalOpen] = useState<boolean>(false);
-  const [isBingecatModalOpen, setIsBingecatModalOpen] = useState<boolean>(false);
   const [isTmdbModalOpen, setIsTmdbModalOpen] = useState<boolean>(false);
   const [isTmdbBrowseOpen, setIsTmdbBrowseOpen] = useState<boolean>(false);
+  const [tmdbRemovalStatus, setTmdbRemovalStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Watchlist persistence in localStorage & server sync for Bingecat Addon
   const [watchlist, setWatchlist] = useState<string[]>(() => {
@@ -114,8 +106,68 @@ export default function App() {
     loadData();
   }, []);
 
+  const showTmdbRemovalStatus = (type: 'success' | 'error', message: string) => {
+    setTmdbRemovalStatus({ type, message });
+    window.setTimeout(() => setTmdbRemovalStatus(null), 4500);
+  };
+
+  const removeFromTmdb = async (series: Series) => {
+    if (!series.tmdbId) return;
+
+    const writeToken = getTmdbWriteToken();
+    const tvListId = cleanTmdbListId(getTmdbListId());
+    const movieListId = cleanTmdbListId(getTmdbMovieListId());
+    const configuredListId = series.mediaType === 'movie' ? movieListId || tvListId : tvListId;
+    if (!writeToken || !configuredListId) return;
+
+    try {
+      const response = await apiFetch('/api/tmdb/remove-from-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listId: tvListId,
+          movieListId,
+          apiKey: writeToken,
+          items: [{
+            id: series.id,
+            title: series.title,
+            tmdbId: series.tmdbId,
+            mediaType: series.mediaType,
+          }],
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          clearTmdbWriteToken();
+          showTmdbRemovalStatus('error', 'TMDB authorization expired. Re-run authorization from the TMDB Sync modal.');
+          return;
+        }
+        throw new Error(data.error || `TMDB removal failed with status ${response.status}`);
+      }
+
+      const listIds = Array.isArray(data.lists)
+        ? data.lists.map((list: { listId?: string }) => list.listId).filter(Boolean)
+        : [];
+      const destination = listIds.length
+        ? listIds.map((listId: string) => `#${listId}`).join(' and ')
+        : `#${configuredListId}`;
+      showTmdbRemovalStatus('success', `Removed ${series.title} from TMDB list ${destination}.`);
+    } catch (error) {
+      showTmdbRemovalStatus(
+        'error',
+        error instanceof Error ? error.message : `Failed to remove ${series.title} from TMDB.`
+      );
+    }
+  };
+
   const handleToggleWatchlist = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    const isRemoving = watchlist.includes(id);
+    if (isRemoving) {
+      const removedSeries = seriesList.find((series) => series.id === id);
+      if (removedSeries) void removeFromTmdb(removedSeries);
+    }
     setWatchlist((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
@@ -152,6 +204,42 @@ export default function App() {
     return counts;
   }, [seriesList]);
 
+  const availableGenres = useMemo(() => {
+    const genreCounts = new Map<string, { label: string; count: number }>();
+    seriesList.forEach((series) => {
+      const seenGenres = new Set<string>();
+      series.genres.forEach((genre) => {
+        const label = genre.trim();
+        const key = label.toLowerCase();
+        if (!key || seenGenres.has(key)) return;
+        seenGenres.add(key);
+        const existing = genreCounts.get(key);
+        genreCounts.set(key, { label: existing?.label || label, count: (existing?.count || 0) + 1 });
+      });
+    });
+    return [
+      'All Genres',
+      ...Array.from(genreCounts.values())
+        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+        .slice(0, 16)
+        .map((genre) => genre.label),
+    ];
+  }, [seriesList]);
+
+  useEffect(() => {
+    if (!availableGenres.includes(selectedGenre)) {
+      setSelectedGenre('All Genres');
+    }
+  }, [availableGenres, selectedGenre]);
+
+  const clearFilters = () => {
+    setSelectedProvider('all');
+    setSelectedGenre('All Genres');
+    setSearchQuery('');
+  };
+
+  const hasActiveFilters = selectedProvider !== 'all' || selectedGenre !== 'All Genres' || Boolean(searchQuery.trim());
+
   // Categorized counts
   const categoryCounts = useMemo(() => {
     const shows = seriesList.filter((s) => s.mediaType !== 'movie');
@@ -167,9 +255,11 @@ export default function App() {
 
   // Filtered series list based on active options
   const filteredSeries = useMemo(() => {
-    // Movies live in their own tab; every other tab tracks series only.
+    // Movies live in their own tab, while classics can include older films.
     let list = seriesList.filter((s) =>
-      activeCategory === 'movies' || activeCategory === 'watchlist' ? true : s.mediaType !== 'movie'
+      activeCategory === 'movies' || activeCategory === 'watchlist' || activeCategory === 'classics'
+        ? true
+        : s.mediaType !== 'movie'
     );
 
     // Category Filter
@@ -306,7 +396,7 @@ export default function App() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-zinc-800/80">
           {/* Genre Scrollable Pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1">
-            {GENRE_LIST.map((genre) => {
+            {availableGenres.map((genre) => {
               const isSelected = selectedGenre === genre;
               return (
                 <button
@@ -367,12 +457,14 @@ export default function App() {
           />
         ) : activeCategory === 'watchlist' ? (
           <WatchlistView
-            watchlistedSeries={watchlistedSeriesObjects}
+            watchlistedSeries={filteredSeries}
             watchlistIds={watchlist}
+            totalWatchlistCount={watchlist.length}
+            hasActiveFilters={hasActiveFilters}
             onToggleWatchlist={handleToggleWatchlist}
             onSelectSeries={handleOpenDetail}
             onBrowseMore={() => setActiveCategory('now_playing')}
-            onOpenBingecatModal={() => setIsBingecatModalOpen(true)}
+            onClearFilters={clearFilters}
             onOpenTmdbModal={() => setIsTmdbModalOpen(true)}
           />
         ) : (
@@ -480,13 +572,6 @@ export default function App() {
         onClose={() => setIsAndroidModalOpen(false)}
       />
 
-      {/* Bingecat Addon & Sync Modal */}
-      <BingecatSyncModal
-        isOpen={isBingecatModalOpen}
-        onClose={() => setIsBingecatModalOpen(false)}
-        watchlistCount={watchlist.length}
-      />
-
       {/* TMDB Direct Integration & Sync Modal */}
       <TmdbSyncModal
         isOpen={isTmdbModalOpen}
@@ -501,6 +586,19 @@ export default function App() {
         onImported={handleTmdbImported}
         catalogTmdbIds={catalogTmdbIds}
       />
+
+      {tmdbRemovalStatus && (
+        <div
+          role="status"
+          className={`fixed bottom-5 right-5 z-50 max-w-sm rounded-xl border px-4 py-3 text-sm font-semibold shadow-xl ${
+            tmdbRemovalStatus.type === 'success'
+              ? 'border-emerald-500/40 bg-emerald-950/90 text-emerald-200'
+              : 'border-rose-500/40 bg-rose-950/90 text-rose-200'
+          }`}
+        >
+          {tmdbRemovalStatus.message}
+        </div>
+      )}
     </div>
   );
 }
