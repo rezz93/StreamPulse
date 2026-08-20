@@ -26,10 +26,21 @@ export interface TmdbListSyncItem {
   mediaType?: 'tv' | 'movie';
 }
 
-export interface TmdbListSyncResult {
+export interface TmdbListSyncSingleResult {
   syncedCount: number;
   requestedCount: number;
   message: string;
+}
+
+export interface TmdbListSyncDetail {
+  listId: string;
+  mediaKind: 'tv' | 'movie';
+  syncedCount: number;
+  requestedCount: number;
+}
+
+export interface TmdbListSyncResult extends TmdbListSyncSingleResult {
+  lists: TmdbListSyncDetail[];
 }
 
 /** Accepts a bare id, a slug (`8687293-watchlist`) or a full themoviedb.org list URL. */
@@ -117,7 +128,7 @@ export async function completeTmdbWriteAuth(readToken: string, requestToken: str
 
 export function toTmdbListItems(items: TmdbListSyncItem[]): Array<{ media_type: 'tv' | 'movie'; media_id: number }> {
   return items
-    .filter((item) => Number.isFinite(Number(item.tmdbId)))
+    .filter((item) => Number.isFinite(Number(item.tmdbId)) && Number(item.tmdbId) > 0)
     .map((item) => ({ media_type: item.mediaType === 'movie' ? 'movie' : 'tv', media_id: Number(item.tmdbId) }));
 }
 
@@ -126,7 +137,7 @@ export async function syncItemsToTmdbList(
   listId: unknown,
   writeToken: string,
   items: TmdbListSyncItem[]
-): Promise<TmdbListSyncResult> {
+): Promise<TmdbListSyncSingleResult> {
   const cleanListId = cleanTmdbListId(listId);
   if (!cleanListId) {
     throw new TmdbError('Enter your numeric TMDB list ID or its themoviedb.org URL.', 400);
@@ -152,4 +163,80 @@ export async function syncItemsToTmdbList(
         ? `Synced ${added} title${added === 1 ? '' : 's'} to TMDB list #${cleanListId}.`
         : `Added ${added} of ${payload.length} titles to TMDB list #${cleanListId} (the rest were already on it).`,
   };
+}
+
+/** Adds known movies and shows to separate lists, retaining the legacy single-list behavior. */
+export async function syncItemsToTmdbLists(
+  tvListId: unknown,
+  movieListId: unknown,
+  writeToken: string,
+  items: TmdbListSyncItem[]
+): Promise<TmdbListSyncResult> {
+  const movieList = cleanTmdbListId(movieListId);
+  const tvItems = movieList
+    ? items.filter((item) => item.mediaType !== 'movie')
+    : items;
+  const movieItems = movieList ? items.filter((item) => item.mediaType === 'movie') : [];
+  const tvPayload = toTmdbListItems(tvItems);
+  const moviePayload = toTmdbListItems(movieItems);
+
+  if (tvPayload.length === 0 && moviePayload.length === 0) {
+    throw new TmdbError('None of your watchlisted titles have a TMDB id yet.', 400);
+  }
+
+  const token = assertBearerToken(writeToken);
+  const details: TmdbListSyncDetail[] = [];
+  if (tvPayload.length > 0) {
+    const result = await syncItemsToTmdbList(tvListId, token, tvItems);
+    details.push({
+      listId: cleanTmdbListId(tvListId),
+      mediaKind: 'tv',
+      syncedCount: result.syncedCount,
+      requestedCount: result.requestedCount,
+    });
+  }
+  if (moviePayload.length > 0) {
+    const result = await syncItemsToTmdbList(movieList, token, movieItems);
+    details.push({
+      listId: movieList,
+      mediaKind: 'movie',
+      syncedCount: result.syncedCount,
+      requestedCount: result.requestedCount,
+    });
+  }
+
+  const syncedCount = details.reduce((total, list) => total + list.syncedCount, 0);
+  const requestedCount = details.reduce((total, list) => total + list.requestedCount, 0);
+  return {
+    syncedCount,
+    requestedCount,
+    message: details
+      .map(
+        (list) =>
+          `${list.mediaKind === 'movie' ? 'Movies' : 'Shows'}: ${list.syncedCount} of ${list.requestedCount} went to TMDB list #${list.listId}.`
+      )
+      .join(' '),
+    lists: details,
+  };
+}
+
+/** Creates a v4 list for the authenticated TMDB user. */
+export async function createTmdbList(writeToken: string, name: string, description?: string): Promise<number> {
+  const token = assertBearerToken(writeToken);
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    throw new TmdbError('Enter a name for the TMDB list.', 400);
+  }
+
+  const data = await tmdbV4<{ id?: number }>('/list', token, {
+    name: trimmedName,
+    description: description?.trim() ?? '',
+    iso_3166_1: 'US',
+    iso_639_1: 'en',
+    public: true,
+  });
+  if (!Number.isFinite(data.id)) {
+    throw new TmdbError('TMDB did not return the new list ID.', 502);
+  }
+  return Number(data.id);
 }

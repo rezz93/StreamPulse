@@ -21,6 +21,7 @@ import { Series } from '../types';
 import { getStoredTmdbToken, storeTmdbToken } from '../tmdbToken';
 
 const WRITE_TOKEN_KEY = 'streampulse_tmdb_write_token';
+const MOVIE_LIST_ID_KEY = 'streampulse_tmdb_movie_list_id';
 
 interface TmdbSyncModalProps {
   isOpen: boolean;
@@ -39,6 +40,9 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
   const [tmdbListId, setTmdbListId] = useState<string>(() => {
     return localStorage.getItem('streampulse_tmdb_list_id') || '8687068';
   });
+  const [tmdbMovieListId, setTmdbMovieListId] = useState<string>(() => {
+    return localStorage.getItem(MOVIE_LIST_ID_KEY) || '';
+  });
   const [tmdbApiKey, setTmdbApiKey] = useState<string>(() => {
     return localStorage.getItem('streampulse_tmdb_api_key') || getStoredTmdbToken();
   });
@@ -48,6 +52,9 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
 
   // Clean numeric List ID
   const cleanListId = tmdbListId.trim().replace(/[^0-9]/g, '') || '8687068';
+  const cleanMovieListId = tmdbMovieListId.trim().replace(/[^0-9]/g, '');
+  const movieCount = watchlistedSeries.filter((series) => series.mediaType === 'movie').length;
+  const showCount = watchlistedSeries.length - movieCount;
 
   // Status states
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -62,6 +69,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
 
   const handleSaveSettings = () => {
     localStorage.setItem('streampulse_tmdb_list_id', tmdbListId.trim());
+    localStorage.setItem(MOVIE_LIST_ID_KEY, tmdbMovieListId.trim());
     localStorage.setItem('streampulse_tmdb_api_key', tmdbApiKey.trim());
     // Share the token with search/import so a key only has to be pasted once.
     storeTmdbToken(tmdbApiKey);
@@ -127,6 +135,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
           readToken: tmdbApiKey.trim(),
           requestToken: pendingRequestToken,
           listId: cleanListId,
+          movieListId: cleanMovieListId,
           watchlistSeries: watchlistedSeries.map((s) => ({
             id: s.id,
             title: s.title,
@@ -146,7 +155,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
         setSyncStatus({
           success: true,
           syncedCount: data.syncedCount || watchlistedSeries.length,
-          message: data.message || `Successfully synced ${watchlistedSeries.length} shows to TMDB List #${cleanListId}!`,
+          message: data.message || `Successfully synced ${showCount} shows and ${movieCount} movies to TMDB!`,
         });
       } else {
         setSyncStatus({
@@ -195,6 +204,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           listId: cleanListId,
+          movieListId: cleanMovieListId,
           apiKey: tokenToUse,
           watchlistSeries: watchlistedSeries.map((s) => ({
             id: s.id,
@@ -211,7 +221,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
         setSyncStatus({
           success: true,
           syncedCount: data.syncedCount || watchlistedSeries.length,
-          message: data.message || `Successfully synced ${watchlistedSeries.length} series to TMDB!`,
+          message: data.message || `Successfully synced ${showCount} shows and ${movieCount} movies to TMDB!`,
         });
       } else {
         // A rejected token usually means the approval expired: re-run the 1-click flow.
@@ -225,6 +235,54 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
       setSyncStatus({
         success: false,
         message: e?.message || 'Network error communicating with TMDB.',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleCreateMoviesList = async () => {
+    const savedWriteToken = localStorage.getItem(WRITE_TOKEN_KEY);
+    if (!savedWriteToken) {
+      setSyncStatus({
+        success: false,
+        message:
+          'TMDB needs your permission before StreamPulse can write to a list. Click "1-Click TMDB Authorize" to grant it.',
+      });
+      return;
+    }
+
+    setIsSyncing(true);
+    setSyncStatus(null);
+    try {
+      const res = await apiFetch('/api/tmdb/create-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          writeToken: savedWriteToken,
+          name: 'StreamPulse Movies',
+          description: 'Movies exported from StreamPulse.',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.listId) {
+        const newListId = String(data.listId);
+        setTmdbMovieListId(newListId);
+        localStorage.setItem(MOVIE_LIST_ID_KEY, newListId);
+        setSyncStatus({
+          success: true,
+          message: `Created movies list #${newListId} on TMDB.`,
+        });
+      } else {
+        setSyncStatus({
+          success: false,
+          message: data.error || 'Could not create a movies list on TMDB.',
+        });
+      }
+    } catch (e: any) {
+      setSyncStatus({
+        success: false,
+        message: e?.message || 'Network error creating the TMDB movies list.',
       });
     } finally {
       setIsSyncing(false);
@@ -315,7 +373,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
             <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-2xl p-4 sm:p-5 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-1.5">
-                  Your TMDB List ID or URL
+                  Shows / TV TMDB List ID or URL
                 </label>
                 <div className="flex items-center gap-2">
                   <input
@@ -341,6 +399,32 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
               </div>
 
               <div>
+                <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-1.5">
+                  Movies TMDB List ID or URL
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Optional: enter a movies list ID or create one"
+                    value={tmdbMovieListId}
+                    onChange={(e) => setTmdbMovieListId(e.target.value)}
+                    className="flex-1 bg-zinc-900 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-500 focus:outline-hidden focus:border-teal-500 transition-all font-mono"
+                  />
+                  <button
+                    onClick={handleCreateMoviesList}
+                    disabled={isSyncing}
+                    className="flex items-center gap-1 px-3 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-teal-300 border border-teal-500/30 text-xs font-bold shrink-0 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <span>Create movies list</span>
+                    <Database className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <p className="text-[11px] text-zinc-400 mt-1">
+                  Leave blank to keep sending movies to your shows / TV list.
+                </p>
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
                   <span>TMDB API Read Access Token (required for sync)</span>
                   <span className="text-[10px] text-zinc-400 font-normal">From themoviedb.org/settings/api</span>
@@ -362,7 +446,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-zinc-950 font-black text-xs transition-all cursor-pointer shadow-lg shadow-teal-500/20 shrink-0"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>{isSyncing ? 'Syncing...' : `Sync ${watchlistedSeries.length} Shows to TMDB`}</span>
+                  <span>{isSyncing ? 'Syncing...' : `Sync ${showCount} Shows + ${movieCount} Movies to TMDB`}</span>
                 </button>
 
                 {!pendingRequestToken ? (
@@ -393,7 +477,18 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
                     rel="noreferrer"
                     className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-all border border-zinc-700 ml-auto"
                   >
-                    <span>Open List on TMDB</span>
+                    <span>Open shows list on TMDB</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-zinc-400" />
+                  </a>
+                )}
+                {cleanMovieListId && (
+                  <a
+                    href={`https://www.themoviedb.org/list/${cleanMovieListId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-all border border-zinc-700"
+                  >
+                    <span>Open movies list on TMDB</span>
                     <ExternalLink className="w-3.5 h-3.5 text-zinc-400" />
                   </a>
                 )}

@@ -17,8 +17,9 @@ import {
 import {
   cleanTmdbListId,
   completeTmdbWriteAuth,
+  createTmdbList,
   startTmdbWriteAuth,
-  syncItemsToTmdbList,
+  syncItemsToTmdbLists,
   TmdbListSyncItem,
 } from "./shared/tmdbListSync";
 import { searchTvmazeShows } from "./shared/tvmazeService";
@@ -381,12 +382,17 @@ async function startServer() {
   // Step 2: Exchange approved request_token for Write Access Token & Sync
   app.post("/api/tmdb/auth-complete", async (req: Request, res: Response) => {
     try {
-      const { readToken, requestToken, listId, watchlistSeries } = req.body;
+      const { readToken, requestToken, listId, movieListId, watchlistSeries } = req.body;
       const { accessToken, accountId } = await completeTmdbWriteAuth(
         String(readToken ?? ""),
         String(requestToken ?? "")
       );
-      const sync = await syncItemsToTmdbList(listId, accessToken, withKnownTmdbIds(watchlistSeries));
+      const sync = await syncItemsToTmdbLists(
+        listId,
+        movieListId,
+        accessToken,
+        withKnownTmdbIds(watchlistSeries)
+      );
       res.json({ success: true, userAccessToken: accessToken, accountId, ...sync });
     } catch (err) {
       sendTmdbError(res, err);
@@ -395,9 +401,24 @@ async function startServer() {
 
   app.post("/api/tmdb/sync-to-list", async (req: Request, res: Response) => {
     try {
-      const { listId, apiKey, watchlistSeries } = req.body;
-      const sync = await syncItemsToTmdbList(listId, String(apiKey ?? ""), withKnownTmdbIds(watchlistSeries));
+      const { listId, movieListId, apiKey, watchlistSeries } = req.body;
+      const sync = await syncItemsToTmdbLists(
+        listId,
+        movieListId,
+        String(apiKey ?? ""),
+        withKnownTmdbIds(watchlistSeries)
+      );
       res.json({ success: true, listId: cleanTmdbListId(listId), ...sync });
+    } catch (err) {
+      sendTmdbError(res, err);
+    }
+  });
+
+  app.post("/api/tmdb/create-list", async (req: Request, res: Response) => {
+    try {
+      const { writeToken, name, description } = req.body;
+      const listId = await createTmdbList(String(writeToken ?? ""), String(name ?? ""), description);
+      res.json({ success: true, listId });
     } catch (err) {
       sendTmdbError(res, err);
     }
