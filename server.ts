@@ -14,6 +14,13 @@ import {
   searchTmdb,
   trendingTmdb,
 } from "./shared/tmdbService";
+import {
+  cleanTmdbListId,
+  completeTmdbWriteAuth,
+  startTmdbWriteAuth,
+  syncItemsToTmdbList,
+  TmdbListSyncItem,
+} from "./shared/tmdbListSync";
 import { searchTvmazeShows } from "./shared/tvmazeService";
 import { Series, StreamingProviderId } from "./src/types";
 
@@ -60,6 +67,16 @@ function tmdbCredentialsFor(req: Request) {
   const headerToken = req.get("x-tmdb-token");
   const bodyToken = typeof req.body?.tmdbToken === "string" ? req.body.tmdbToken : undefined;
   return resolveTmdbCredentials(headerToken || bodyToken);
+}
+
+/** Fills in TMDB ids for the app's hand-curated series from the local IMDb/TMDB mapping. */
+function withKnownTmdbIds(watchlistSeries: unknown): TmdbListSyncItem[] {
+  return (Array.isArray(watchlistSeries) ? watchlistSeries : []).map((item: any) => ({
+    id: item.id,
+    title: item.title,
+    mediaType: item.mediaType === "movie" ? "movie" : "tv",
+    tmdbId: item.tmdbId || IMDB_MAPPING[item.id]?.tmdbId,
+  }));
 }
 
 function sendTmdbError(res: Response, err: unknown) {
@@ -353,38 +370,11 @@ async function startServer() {
   // Step 1: Request TMDB write-permission token
   app.post("/api/tmdb/auth-start", async (req: Request, res: Response) => {
     try {
-      const { readToken } = req.body;
-      if (!readToken) {
-        res.status(400).json({ error: "TMDB Read Access Token is required." });
-        return;
-      }
-
-      const response = await fetch("https://api.themoviedb.org/4/auth/request_token", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${String(readToken).trim()}`,
-          "Content-Type": "application/json;charset=utf-8"
-        },
-        body: JSON.stringify({
-          redirect_to: "https://www.themoviedb.org"
-        })
-      });
-
-      const data = await response.json();
-      if (response.ok && data.request_token) {
-        res.json({
-          success: true,
-          request_token: data.request_token,
-          authUrl: `https://www.themoviedb.org/auth/access?request_token=${data.request_token}`
-        });
-      } else {
-        res.status(400).json({
-          error: data.status_message || "Failed to create TMDB request token."
-        });
-      }
-    } catch (err: any) {
-      console.error("TMDB Auth start error:", err);
-      res.status(500).json({ error: err.message || "Failed to contact TMDB." });
+      const { readToken, redirectTo } = req.body;
+      const { requestToken, authUrl } = await startTmdbWriteAuth(String(readToken ?? ""), redirectTo);
+      res.json({ success: true, request_token: requestToken, authUrl });
+    } catch (err) {
+      sendTmdbError(res, err);
     }
   });
 
@@ -392,225 +382,24 @@ async function startServer() {
   app.post("/api/tmdb/auth-complete", async (req: Request, res: Response) => {
     try {
       const { readToken, requestToken, listId, watchlistSeries } = req.body;
-      if (!readToken || !requestToken) {
-        res.status(400).json({ error: "Missing read token or request token." });
-        return;
-      }
-
-      const cleanListId = String(listId || "").replace(/[^0-9]/g, "");
-      if (!cleanListId) {
-        res.status(400).json({ error: "Numeric TMDB List ID is required." });
-        return;
-      }
-
-      // Exchange request token for access token
-      const accessRes = await fetch("https://api.themoviedb.org/4/auth/access_token", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${String(readToken).trim()}`,
-          "Content-Type": "application/json;charset=utf-8"
-        },
-        body: JSON.stringify({ request_token: requestToken })
-      });
-
-      const accessData = await accessRes.json();
-      if (!accessRes.ok || !accessData.access_token) {
-        res.status(400).json({
-          error: accessData.status_message || "Approval pending. Please make sure you clicked 'Approve' on the TMDB page first, then try again."
-        });
-        return;
-      }
-
-      const userAccessToken = accessData.access_token;
-      const accountId = accessData.account_id;
-
-      // Sync items with the newly authorized user access token
-      const itemsToAdd = (Array.isArray(watchlistSeries) ? watchlistSeries : [])
-        .map((item: any) => ({
-          title: item.title,
-          tmdbId: item.tmdbId || IMDB_MAPPING[item.id]?.tmdbId
-        }))
-        .filter((item: any) => Boolean(item.tmdbId));
-
-      if (itemsToAdd.length === 0) {
-        res.json({
-          success: true,
-          userAccessToken,
-          accountId,
-          syncedCount: 0,
-          message: "TMDB Write Authorization granted successfully!"
-        });
-        return;
-      }
-
-      const syncRes = await fetch(`https://api.themoviedb.org/4/list/${cleanListId}/items`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${userAccessToken}`,
-          "Content-Type": "application/json;charset=utf-8"
-        },
-        body: JSON.stringify({
-          items: itemsToAdd.map(it => ({
-            media_type: "tv",
-            media_id: it.tmdbId
-          }))
-        })
-      });
-
-      const syncData = await syncRes.json();
-      if (syncRes.ok && syncData.success !== false) {
-        res.json({
-          success: true,
-          userAccessToken,
-          accountId,
-          syncedCount: itemsToAdd.length,
-          message: `Authorization approved! Successfully synced ${itemsToAdd.length} shows directly to TMDB List #${cleanListId}!`
-        });
-      } else {
-        res.json({
-          success: true,
-          userAccessToken,
-          accountId,
-          warning: syncData.status_message,
-          message: `Authorization approved! You can now sync to List #${cleanListId}.`
-        });
-      }
-    } catch (err: any) {
-      console.error("TMDB Auth complete error:", err);
-      res.status(500).json({ error: err.message || "Failed to complete TMDB authorization." });
+      const { accessToken, accountId } = await completeTmdbWriteAuth(
+        String(readToken ?? ""),
+        String(requestToken ?? "")
+      );
+      const sync = await syncItemsToTmdbList(listId, accessToken, withKnownTmdbIds(watchlistSeries));
+      res.json({ success: true, userAccessToken: accessToken, accountId, ...sync });
+    } catch (err) {
+      sendTmdbError(res, err);
     }
   });
 
   app.post("/api/tmdb/sync-to-list", async (req: Request, res: Response) => {
     try {
       const { listId, apiKey, watchlistSeries } = req.body;
-      if (!listId) {
-        res.status(400).json({ error: "TMDB List ID is required" });
-        return;
-      }
-
-      // Clean listId: extract digits from full URL or slug
-      const cleanListId = String(listId).replace(/[^0-9]/g, '');
-      if (!cleanListId) {
-        res.status(400).json({ error: "Could not extract a valid numeric TMDB List ID." });
-        return;
-      }
-
-      const token = apiKey ? String(apiKey).trim() : '';
-
-      if (!token) {
-        // No token provided: return prepared items with helpful guidance
-        res.json({
-          success: true,
-          syncedCount: Array.isArray(watchlistSeries) ? watchlistSeries.length : 0,
-          message: `Watchlist prepared for TMDB List #${cleanListId}. You can add them with 1-click or paste your TMDB Read Access Token.`
-        });
-        return;
-      }
-
-      const itemsToAdd = (Array.isArray(watchlistSeries) ? watchlistSeries : [])
-        .map(item => ({
-          title: item.title,
-          tmdbId: item.tmdbId || IMDB_MAPPING[item.id]?.tmdbId
-        }))
-        .filter(item => Boolean(item.tmdbId));
-
-      if (itemsToAdd.length === 0) {
-        res.status(400).json({ error: "No valid TMDB show IDs found in your watchlist." });
-        return;
-      }
-
-      // 1. Try TMDB v4 batch list items endpoint (Standard for TMDB API Read Access Tokens)
-      const isBearerToken = token.length > 50 || token.startsWith('eyJ');
-      const authHeader = isBearerToken ? `Bearer ${token}` : `Bearer ${token}`;
-
-      let v4Success = false;
-      let v4Data: any = null;
-
-      try {
-        const v4Payload = {
-          items: itemsToAdd.map(it => ({
-            media_type: 'tv',
-            media_id: it.tmdbId
-          }))
-        };
-
-        const v4Res = await fetch(`https://api.themoviedb.org/4/list/${cleanListId}/items`, {
-          method: 'POST',
-          headers: {
-            'Authorization': authHeader,
-            'Content-Type': 'application/json;charset=utf-8'
-          },
-          body: JSON.stringify(v4Payload)
-        });
-
-        v4Data = await v4Res.json();
-        if (v4Res.ok && (v4Data.success !== false)) {
-          v4Success = true;
-          res.json({
-            success: true,
-            syncedCount: itemsToAdd.length,
-            message: `Successfully synced ${itemsToAdd.length} shows to TMDB List #${cleanListId}!`
-          });
-          return;
-        }
-      } catch (err) {
-        console.log("TMDB v4 batch attempt error:", err);
-      }
-
-      // 2. Try TMDB v3 individual add_item endpoint
-      let v3SuccessCount = 0;
-      let lastV3Error = '';
-
-      for (const item of itemsToAdd) {
-        try {
-          const v3Url = token.length === 32 
-            ? `https://api.themoviedb.org/3/list/${cleanListId}/add_item?api_key=${token}`
-            : `https://api.themoviedb.org/3/list/${cleanListId}/add_item`;
-
-          const v3Res = await fetch(v3Url, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json;charset=utf-8'
-            },
-            body: JSON.stringify({ media_id: item.tmdbId })
-          });
-
-          const v3Data = await v3Res.json();
-          if (v3Res.ok && v3Data.status_code === 12 || v3Data.success) {
-            v3SuccessCount++;
-          } else {
-            lastV3Error = v3Data.status_message || v3Data.error || `HTTP ${v3Res.status}`;
-          }
-        } catch (err: any) {
-          lastV3Error = err.message;
-        }
-      }
-
-      if (v3SuccessCount > 0) {
-        res.json({
-          success: true,
-          syncedCount: v3SuccessCount,
-          message: `Successfully added ${v3SuccessCount} of ${itemsToAdd.length} shows to TMDB List #${cleanListId}!`
-        });
-        return;
-      }
-
-      // If both API calls failed, give exact diagnostic explanation
-      const diagnostic = (v4Data && v4Data.status_message) 
-        ? v4Data.status_message 
-        : (lastV3Error || "TMDB API authentication was rejected. TMDB lists require an API Read Access Token (from themoviedb.org/settings/api).");
-
-      res.status(400).json({
-        error: diagnostic,
-        requiresToken: true,
-        items: itemsToAdd
-      });
-
-    } catch (err: any) {
-      console.error("TMDB Sync error:", err);
-      res.status(500).json({ error: `Server error: ${err.message || 'Could not connect to TMDB'}` });
+      const sync = await syncItemsToTmdbList(listId, String(apiKey ?? ""), withKnownTmdbIds(watchlistSeries));
+      res.json({ success: true, listId: cleanTmdbListId(listId), ...sync });
+    } catch (err) {
+      sendTmdbError(res, err);
     }
   });
 

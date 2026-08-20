@@ -46,5 +46,16 @@ In the static build:
 - The catalog, provider filters, watchlist, and global TVMaze search all work.
 - TMDB search and imports work with a visitor-supplied key (stored in their browser only);
   imported titles persist in `localStorage` instead of `data/tmdb-catalog.json`.
-- AI season intelligence, the Bingecat/Stremio addon, and TMDB list sync are unavailable and
-  report as much, since they need the server.
+- TMDB list sync works too: the v4 approval flow and list writes run against
+  `api.themoviedb.org` from the browser, so no server is involved.
+- AI season intelligence and the Bingecat/Stremio addon are unavailable and report as much,
+  since they need the server.
+
+### Syncing your watchlist to a TMDB list
+
+Writing to a TMDB list needs your account's permission, not just an API key:
+
+1. Paste your **API Read Access Token** (themoviedb.org/settings/api) into the TMDB modal.
+2. Click **1-Click TMDB Authorize** and approve the request on themoviedb.org.
+3. Come back and click **Complete Sync** — the write token is kept in `localStorage` so later
+   syncs are one click.
