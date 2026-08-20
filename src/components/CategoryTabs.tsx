@@ -1,6 +1,6 @@
 import React from 'react';
 import { SeriesCategory } from '../types';
-import { Play, Calendar, Sparkles, Archive, Bookmark } from 'lucide-react';
+import { Play, Calendar, Sparkles, Archive, Bookmark, Film } from 'lucide-react';
 
 interface CategoryTabsProps {
   activeCategory: SeriesCategory;
@@ -8,6 +8,7 @@ interface CategoryTabsProps {
   watchlistCount: number;
   newSeasonsCount: number;
   upcomingCount: number;
+  moviesCount: number;
 }
 
 export const CategoryTabs: React.FC<CategoryTabsProps> = ({
@@ -16,6 +17,7 @@ export const CategoryTabs: React.FC<CategoryTabsProps> = ({
   watchlistCount,
   newSeasonsCount,
   upcomingCount,
+  moviesCount,
 }) => {
   const tabs: Array<{
     id: SeriesCategory;
@@ -30,6 +32,13 @@ export const CategoryTabs: React.FC<CategoryTabsProps> = ({
       label: 'Now Streaming',
       description: 'Active & trending seasons',
       icon: Play,
+    },
+    {
+      id: 'movies',
+      label: 'Movies',
+      description: 'Films imported from TMDB',
+      icon: Film,
+      badge: moviesCount > 0 ? moviesCount : undefined,
     },
     {
       id: 'upcoming',
