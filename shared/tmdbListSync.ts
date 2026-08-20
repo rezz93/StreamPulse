@@ -43,6 +43,20 @@ export interface TmdbListSyncResult extends TmdbListSyncSingleResult {
   lists: TmdbListSyncDetail[];
 }
 
+export interface TmdbListRemovalDetail {
+  listId: string;
+  mediaKind: 'tv' | 'movie';
+  removedCount: number;
+  requestedCount: number;
+}
+
+export interface TmdbListRemovalResult {
+  removedCount: number;
+  requestedCount: number;
+  message: string;
+  lists: TmdbListRemovalDetail[];
+}
+
 /** Accepts a bare id, a slug (`8687293-watchlist`) or a full themoviedb.org list URL. */
 export function cleanTmdbListId(raw: unknown): string {
   const value = String(raw ?? '');
@@ -216,6 +230,83 @@ export async function syncItemsToTmdbLists(
           `${list.mediaKind === 'movie' ? 'Movies' : 'Shows'}: ${list.syncedCount} of ${list.requestedCount} went to TMDB list #${list.listId}.`
       )
       .join(' '),
+    lists: details,
+  };
+}
+
+async function removeItemsFromTmdbList(
+  listId: unknown,
+  writeToken: string,
+  items: TmdbListSyncItem[]
+): Promise<{ removedCount: number; requestedCount: number }> {
+  const cleanListId = cleanTmdbListId(listId);
+  if (!cleanListId) {
+    throw new TmdbError('Enter your numeric TMDB list ID or its themoviedb.org URL.', 400);
+  }
+
+  const payload = toTmdbListItems(items);
+  if (payload.length === 0) {
+    return { removedCount: 0, requestedCount: 0 };
+  }
+
+  const token = assertBearerToken(writeToken);
+  const data = await tmdbV4<{ results?: Array<{ success?: boolean }> }>(
+    `/list/${cleanListId}/items`,
+    token,
+    { items: payload },
+    'DELETE'
+  );
+  const results = data.results ?? [];
+  const removedCount = results.length ? results.filter((result) => result.success !== false).length : payload.length;
+  return { removedCount, requestedCount: payload.length };
+}
+
+/** Removes known movies and shows from their configured lists. */
+export async function removeItemsFromTmdbLists(
+  tvListId: unknown,
+  movieListId: unknown,
+  writeToken: string,
+  items: TmdbListSyncItem[]
+): Promise<TmdbListRemovalResult> {
+  const movieList = cleanTmdbListId(movieListId);
+  const tvItems = movieList
+    ? items.filter((item) => item.mediaType !== 'movie')
+    : items;
+  const movieItems = movieList ? items.filter((item) => item.mediaType === 'movie') : [];
+  const tvPayload = toTmdbListItems(tvItems);
+  const moviePayload = toTmdbListItems(movieItems);
+  const details: TmdbListRemovalDetail[] = [];
+
+  if (tvPayload.length > 0) {
+    const result = await removeItemsFromTmdbList(tvListId, writeToken, tvItems);
+    details.push({
+      listId: cleanTmdbListId(tvListId),
+      mediaKind: 'tv',
+      ...result,
+    });
+  }
+  if (moviePayload.length > 0) {
+    const result = await removeItemsFromTmdbList(movieList, writeToken, movieItems);
+    details.push({
+      listId: movieList,
+      mediaKind: 'movie',
+      ...result,
+    });
+  }
+
+  const removedCount = details.reduce((total, list) => total + list.removedCount, 0);
+  const requestedCount = details.reduce((total, list) => total + list.requestedCount, 0);
+  return {
+    removedCount,
+    requestedCount,
+    message: details.length
+      ? details
+          .map(
+            (list) =>
+              `${list.mediaKind === 'movie' ? 'Movies' : 'Shows'}: removed ${list.removedCount} of ${list.requestedCount} from TMDB list #${list.listId}.`
+          )
+          .join(' ')
+      : 'No TMDB titles to remove.',
     lists: details,
   };
 }

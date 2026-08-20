@@ -19,9 +19,14 @@ import {
 } from 'lucide-react';
 import { Series } from '../types';
 import { getStoredTmdbToken, storeTmdbToken } from '../tmdbToken';
-
-const WRITE_TOKEN_KEY = 'streampulse_tmdb_write_token';
-const MOVIE_LIST_ID_KEY = 'streampulse_tmdb_movie_list_id';
+import {
+  clearTmdbWriteToken,
+  getTmdbListId,
+  getTmdbMovieListId,
+  getTmdbWriteToken,
+  saveTmdbListSettings,
+  saveTmdbWriteToken,
+} from '../tmdbSettings';
 
 interface TmdbSyncModalProps {
   isOpen: boolean;
@@ -38,10 +43,10 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
 }) => {
   // Stored TMDB settings
   const [tmdbListId, setTmdbListId] = useState<string>(() => {
-    return localStorage.getItem('streampulse_tmdb_list_id') || '8687068';
+    return getTmdbListId();
   });
   const [tmdbMovieListId, setTmdbMovieListId] = useState<string>(() => {
-    return localStorage.getItem(MOVIE_LIST_ID_KEY) || '';
+    return getTmdbMovieListId();
   });
   const [tmdbApiKey, setTmdbApiKey] = useState<string>(() => {
     return localStorage.getItem('streampulse_tmdb_api_key') || getStoredTmdbToken();
@@ -68,8 +73,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
   if (!isOpen) return null;
 
   const handleSaveSettings = () => {
-    localStorage.setItem('streampulse_tmdb_list_id', tmdbListId.trim());
-    localStorage.setItem(MOVIE_LIST_ID_KEY, tmdbMovieListId.trim());
+    saveTmdbListSettings(tmdbListId.trim(), tmdbMovieListId.trim());
     localStorage.setItem('streampulse_tmdb_api_key', tmdbApiKey.trim());
     // Share the token with search/import so a key only has to be pasted once.
     storeTmdbToken(tmdbApiKey);
@@ -149,7 +153,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
       const data = await res.json();
       if (res.ok && data.success) {
         if (data.userAccessToken) {
-          localStorage.setItem(WRITE_TOKEN_KEY, data.userAccessToken);
+          saveTmdbWriteToken(data.userAccessToken);
         }
         setPendingRequestToken('');
         setSyncStatus({
@@ -183,7 +187,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
       return;
     }
 
-    const savedWriteToken = localStorage.getItem(WRITE_TOKEN_KEY);
+    const savedWriteToken = getTmdbWriteToken();
     if (!savedWriteToken) {
       setSyncStatus({
         success: false,
@@ -225,7 +229,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
         });
       } else {
         // A rejected token usually means the approval expired: re-run the 1-click flow.
-        if (res.status === 401) localStorage.removeItem(WRITE_TOKEN_KEY);
+        if (res.status === 401 || res.status === 403) clearTmdbWriteToken();
         setSyncStatus({
           success: false,
           message: data.error || 'Write authorization needed from TMDB. Click "1-Click TMDB Authorize" below.',
@@ -242,7 +246,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
   };
 
   const handleCreateMoviesList = async () => {
-    const savedWriteToken = localStorage.getItem(WRITE_TOKEN_KEY);
+    const savedWriteToken = getTmdbWriteToken();
     if (!savedWriteToken) {
       setSyncStatus({
         success: false,
@@ -268,7 +272,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
       if (res.ok && data.success && data.listId) {
         const newListId = String(data.listId);
         setTmdbMovieListId(newListId);
-        localStorage.setItem(MOVIE_LIST_ID_KEY, newListId);
+        saveTmdbListSettings(tmdbListId.trim(), newListId);
         setSyncStatus({
           success: true,
           message: `Created movies list #${newListId} on TMDB.`,

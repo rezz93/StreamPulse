@@ -3,6 +3,7 @@ import {
   cleanTmdbListId,
   completeTmdbWriteAuth,
   createTmdbList,
+  removeItemsFromTmdbLists,
   startTmdbWriteAuth,
   syncItemsToTmdbLists,
   TmdbListSyncItem,
@@ -138,6 +139,13 @@ async function handleStatically(url: URL, init?: RequestInit): Promise<Response>
       success: true,
       listId: cleanTmdbListId(body.listId),
       ...(await syncItemsToTmdbLists(body.listId, body.movieListId, body.apiKey, items)),
+    });
+  }
+  if (pathname === '/api/tmdb/remove-from-list' && method === 'POST') {
+    const items = (body.items ?? body.watchlistSeries ?? []) as TmdbListSyncItem[];
+    return json({
+      success: true,
+      ...(await removeItemsFromTmdbLists(body.listId, body.movieListId, body.apiKey, items)),
     });
   }
   if (pathname === '/api/tmdb/create-list' && method === 'POST') {
