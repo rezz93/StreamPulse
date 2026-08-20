@@ -56,6 +56,7 @@ export interface Series {
   id: string;
   tmdbId?: number;
   imdbId?: string;
+  mediaType?: 'tv' | 'movie';
   title: string;
   originalTitle?: string;
   tagline: string;

@@ -18,6 +18,7 @@ import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { AndroidPwaModal } from './components/AndroidPwaModal';
 import { BingecatSyncModal } from './components/BingecatSyncModal';
 import { TmdbSyncModal } from './components/TmdbSyncModal';
+import { TmdbBrowseModal } from './components/TmdbBrowseModal';
 import {
   SlidersHorizontal,
   Flame,
@@ -63,6 +64,7 @@ export default function App() {
   const [isAndroidModalOpen, setIsAndroidModalOpen] = useState<boolean>(false);
   const [isBingecatModalOpen, setIsBingecatModalOpen] = useState<boolean>(false);
   const [isTmdbModalOpen, setIsTmdbModalOpen] = useState<boolean>(false);
+  const [isTmdbBrowseOpen, setIsTmdbBrowseOpen] = useState<boolean>(false);
 
   // Watchlist persistence in localStorage & server sync for Bingecat Addon
   const [watchlist, setWatchlist] = useState<string[]>(() => {
@@ -116,6 +118,19 @@ export default function App() {
     setWatchlist((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
+  };
+
+  const handleTmdbImported = (series: Series, addToWatchlist: boolean) => {
+    setSeriesList((prev) => {
+      const existing = prev.findIndex((s) => s.id === series.id);
+      if (existing < 0) return [series, ...prev];
+      const next = [...prev];
+      next[existing] = series;
+      return next;
+    });
+    if (addToWatchlist) {
+      setWatchlist((prev) => (prev.includes(series.id) ? prev : [...prev, series.id]));
+    }
   };
 
   const handleOpenDetail = (series: Series) => {
@@ -214,6 +229,12 @@ export default function App() {
     return seriesList.filter((s) => watchlist.includes(s.id));
   }, [seriesList, watchlist]);
 
+  // TMDB ids already tracked, so the picker can mark them as added
+  const catalogTmdbIds = useMemo(
+    () => seriesList.map((s) => s.tmdbId).filter((id): id is number => typeof id === 'number'),
+    [seriesList]
+  );
+
   return (
     <div id="streampulse-app" className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
       {/* Header */}
@@ -224,6 +245,7 @@ export default function App() {
         onOpenAndroidModal={() => setIsAndroidModalOpen(true)}
         onOpenBingecatModal={() => setIsBingecatModalOpen(true)}
         onOpenTmdbModal={() => setIsTmdbModalOpen(true)}
+        onOpenTmdbBrowse={() => setIsTmdbBrowseOpen(true)}
         activeCategory={activeCategory}
         onSelectCategory={setActiveCategory}
         watchlistCount={watchlist.length}
@@ -445,6 +467,14 @@ export default function App() {
         isOpen={isTmdbModalOpen}
         onClose={() => setIsTmdbModalOpen(false)}
         watchlistedSeries={watchlistedSeriesObjects}
+      />
+
+      {/* TMDB Catalog Browser: add movies & shows from TMDB */}
+      <TmdbBrowseModal
+        isOpen={isTmdbBrowseOpen}
+        onClose={() => setIsTmdbBrowseOpen(false)}
+        onImported={handleTmdbImported}
+        catalogTmdbIds={catalogTmdbIds}
       />
     </div>
   );

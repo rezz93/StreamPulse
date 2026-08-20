@@ -1,9 +1,19 @@
+import "dotenv/config";
 import express, { Request, Response } from "express";
+import fs from "fs";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { INITIAL_SERIES_DATABASE, PROVIDERS } from "./server/seriesData";
 import { fetchAISeasonIntelligence } from "./server/geminiService";
 import { getAddonManifest, seriesToMetaItem, seriesToFullMeta, IMDB_MAPPING } from "./server/bingecatAddon";
+import {
+  TmdbError,
+  TmdbMediaType,
+  fetchTmdbTitle,
+  resolveTmdbCredentials,
+  searchTmdb,
+  trendingTmdb,
+} from "./server/tmdbService";
 import { Series, StreamingProviderId } from "./src/types";
 
 let seriesDatabase: Series[] = INITIAL_SERIES_DATABASE.map(s => {
@@ -15,6 +25,50 @@ let seriesDatabase: Series[] = INITIAL_SERIES_DATABASE.map(s => {
   };
 });
 let currentServerWatchlist: string[] = ['severance', 'the-last-of-us', 'stranger-things', 'the-bear', 'house-of-the-dragon', 'shogun'];
+
+// Titles imported from TMDB by the user, persisted best-effort so they survive a restart.
+const CATALOG_FILE = path.join(process.cwd(), "data", "tmdb-catalog.json");
+
+function loadImportedTitles(): Series[] {
+  try {
+    const raw = fs.readFileSync(CATALOG_FILE, "utf-8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as Series[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistImportedTitles(titles: Series[]) {
+  try {
+    fs.mkdirSync(path.dirname(CATALOG_FILE), { recursive: true });
+    fs.writeFileSync(CATALOG_FILE, JSON.stringify(titles, null, 2));
+  } catch (err) {
+    console.warn("Could not persist imported TMDB catalog:", err);
+  }
+}
+
+let importedTitles: Series[] = loadImportedTitles();
+seriesDatabase = [...importedTitles, ...seriesDatabase];
+
+function parseMediaType(value: unknown): TmdbMediaType | null {
+  return value === "tv" || value === "movie" ? value : null;
+}
+
+function tmdbCredentialsFor(req: Request) {
+  const headerToken = req.get("x-tmdb-token");
+  const bodyToken = typeof req.body?.tmdbToken === "string" ? req.body.tmdbToken : undefined;
+  return resolveTmdbCredentials(headerToken || bodyToken);
+}
+
+function sendTmdbError(res: Response, err: unknown) {
+  if (err instanceof TmdbError) {
+    res.status(err.status).json({ error: err.message });
+    return;
+  }
+  console.error("TMDB request error:", err);
+  res.status(500).json({ error: "Could not reach TMDB. Please try again." });
+}
 
 async function startServer() {
   const app = express();
@@ -242,6 +296,126 @@ async function startServer() {
   // ==========================================
   // --- TMDB DIRECT INTEGRATION ENDPOINTS ----
   // ==========================================
+
+  // Whether the server has a TMDB key configured (so the UI can prompt for one if not)
+  app.get("/api/tmdb/status", (_req: Request, res: Response) => {
+    res.json({
+      configured: Boolean(resolveTmdbCredentials()),
+      importedCount: importedTitles.length,
+    });
+  });
+
+  // Search TMDB for movies and shows to add to the catalog
+  app.get("/api/tmdb/search", async (req: Request, res: Response) => {
+    const credentials = tmdbCredentialsFor(req);
+    if (!credentials) {
+      res.status(400).json({ error: "No TMDB API key configured. Add TMDB_API_KEY or paste a TMDB token.", needsToken: true });
+      return;
+    }
+
+    const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    if (!query) {
+      res.json({ results: [] });
+      return;
+    }
+
+    const type = req.query.type === "tv" || req.query.type === "movie" ? req.query.type : "multi";
+    try {
+      const results = await searchTmdb(credentials, query, type);
+      res.json({ results });
+    } catch (err) {
+      sendTmdbError(res, err);
+    }
+  });
+
+  // Trending TMDB titles, used as the default suggestions in the picker
+  app.get("/api/tmdb/trending", async (req: Request, res: Response) => {
+    const credentials = tmdbCredentialsFor(req);
+    if (!credentials) {
+      res.status(400).json({ error: "No TMDB API key configured. Add TMDB_API_KEY or paste a TMDB token.", needsToken: true });
+      return;
+    }
+
+    const type = req.query.type === "tv" || req.query.type === "movie" ? req.query.type : "all";
+    try {
+      const results = await trendingTmdb(credentials, type);
+      res.json({ results });
+    } catch (err) {
+      sendTmdbError(res, err);
+    }
+  });
+
+  // Full TMDB metadata for a single title (providers, cast, seasons)
+  app.get("/api/tmdb/title/:mediaType/:tmdbId", async (req: Request, res: Response) => {
+    const credentials = tmdbCredentialsFor(req);
+    if (!credentials) {
+      res.status(400).json({ error: "No TMDB API key configured. Add TMDB_API_KEY or paste a TMDB token.", needsToken: true });
+      return;
+    }
+
+    const mediaType = parseMediaType(req.params.mediaType);
+    const tmdbId = Number(req.params.tmdbId);
+    if (!mediaType || !Number.isFinite(tmdbId)) {
+      res.status(400).json({ error: "A valid media type (tv|movie) and numeric TMDB id are required." });
+      return;
+    }
+
+    try {
+      res.json(await fetchTmdbTitle(credentials, mediaType, tmdbId));
+    } catch (err) {
+      sendTmdbError(res, err);
+    }
+  });
+
+  // Import a TMDB title into the StreamPulse catalog
+  app.post("/api/catalog/tmdb", async (req: Request, res: Response) => {
+    const credentials = tmdbCredentialsFor(req);
+    if (!credentials) {
+      res.status(400).json({ error: "No TMDB API key configured. Add TMDB_API_KEY or paste a TMDB token.", needsToken: true });
+      return;
+    }
+
+    const mediaType = parseMediaType(req.body?.mediaType);
+    const tmdbId = Number(req.body?.tmdbId);
+    if (!mediaType || !Number.isFinite(tmdbId)) {
+      res.status(400).json({ error: "A valid media type (tv|movie) and numeric TMDB id are required." });
+      return;
+    }
+
+    try {
+      const series = await fetchTmdbTitle(credentials, mediaType, tmdbId);
+      const existing = seriesDatabase.findIndex(s => s.id === series.id || (s.tmdbId === series.tmdbId && s.mediaType === mediaType));
+      if (existing >= 0) {
+        seriesDatabase[existing] = { ...seriesDatabase[existing], ...series, id: seriesDatabase[existing].id };
+        importedTitles = importedTitles.map(s => (s.id === series.id ? series : s));
+        persistImportedTitles(importedTitles);
+        res.json({ series: seriesDatabase[existing], alreadyInCatalog: true });
+        return;
+      }
+
+      importedTitles = [series, ...importedTitles];
+      seriesDatabase = [series, ...seriesDatabase];
+      persistImportedTitles(importedTitles);
+      res.json({ series, alreadyInCatalog: false });
+    } catch (err) {
+      sendTmdbError(res, err);
+    }
+  });
+
+  // Remove a previously imported TMDB title
+  app.delete("/api/catalog/tmdb/:id", (req: Request, res: Response) => {
+    const { id } = req.params;
+    if (!importedTitles.some(s => s.id === id)) {
+      res.status(404).json({ error: "That title was not imported from TMDB." });
+      return;
+    }
+
+    importedTitles = importedTitles.filter(s => s.id !== id);
+    seriesDatabase = seriesDatabase.filter(s => s.id !== id);
+    currentServerWatchlist = currentServerWatchlist.filter(watchId => watchId !== id);
+    persistImportedTitles(importedTitles);
+    res.json({ success: true, importedCount: importedTitles.length });
+  });
 
   // Step 1: Request TMDB write-permission token
   app.post("/api/tmdb/auth-start", async (req: Request, res: Response) => {

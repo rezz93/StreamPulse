@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tv, Search, Bookmark, Sparkles, Flame, Calendar, Puzzle, RefreshCw } from 'lucide-react';
+import { Tv, Search, Bookmark, Sparkles, Flame, Calendar, Puzzle, RefreshCw, Plus } from 'lucide-react';
 import { SeriesCategory } from '../types';
 
 interface HeaderProps {
@@ -9,6 +9,7 @@ interface HeaderProps {
   onOpenAndroidModal: () => void;
   onOpenBingecatModal: () => void;
   onOpenTmdbModal: () => void;
+  onOpenTmdbBrowse: () => void;
   activeCategory: SeriesCategory;
   onSelectCategory: (category: SeriesCategory) => void;
   watchlistCount: number;
@@ -24,6 +25,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAndroidModal,
   onOpenBingecatModal,
   onOpenTmdbModal,
+  onOpenTmdbBrowse,
   activeCategory,
   onSelectCategory,
   watchlistCount,
@@ -126,6 +128,17 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
               <span className="hidden sm:inline">Global TV Finder</span>
+            </button>
+
+            {/* Add titles from TMDB button */}
+            <button
+              id="btn-tmdb-browse"
+              onClick={onOpenTmdbBrowse}
+              title="Search TMDB and add movies or shows to your catalog"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white border border-teal-400/50 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shadow-xs"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Add from TMDB</span>
             </button>
 
             {/* TMDB Direct Sync button */}
