@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '../apiClient';
 import {
   X,
   Copy,
@@ -51,7 +52,7 @@ export const BingecatSyncModal: React.FC<BingecatSyncModalProps> = ({
   const handleDownloadJson = async () => {
     setIsDownloading(true);
     try {
-      const res = await fetch('/api/bingecat/export.json');
+      const res = await apiFetch('/api/bingecat/export.json');
       const data = await res.json();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -71,7 +72,7 @@ export const BingecatSyncModal: React.FC<BingecatSyncModalProps> = ({
 
   const handleCopyJson = async () => {
     try {
-      const res = await fetch('/api/bingecat/export.json');
+      const res = await apiFetch('/api/bingecat/export.json');
       const data = await res.json();
       if (navigator.clipboard) {
         navigator.clipboard.writeText(JSON.stringify(data, null, 2));

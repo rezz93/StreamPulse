@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '../apiClient';
 import { Series, AISeasonIntel } from '../types';
 import { ProviderBadge } from './ProviderBadge';
 import { StatusBadge } from './StatusBadge';
@@ -71,7 +72,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
     setIsLoadingIntel(true);
     setIntelError(null);
     try {
-      const response = await fetch('/api/series/ai-season-intel', {
+      const response = await apiFetch('/api/series/ai-season-intel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
