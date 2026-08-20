@@ -127,6 +127,7 @@ export default function App() {
         body: JSON.stringify({
           listId: tvListId,
           movieListId,
+          apiKey: writeToken,
           items: [{
             id: series.id,
             title: series.title,
