@@ -2,8 +2,8 @@ export const TMDB_LIST_ID_KEY = 'streampulse_tmdb_list_id';
 export const TMDB_MOVIE_LIST_ID_KEY = 'streampulse_tmdb_movie_list_id';
 export const TMDB_WRITE_TOKEN_KEY = 'streampulse_tmdb_write_token';
 export const TMDB_ACCOUNT_WATCHLIST_KEY = 'streampulse_tmdb_account_watchlist';
-/** Kept as the example/placeholder list id; sync no longer falls back to it. */
-export const EXAMPLE_TMDB_LIST_ID = '8687293';
+/** List ids earlier builds pre-filled. The list has since been deleted on TMDB. */
+const RETIRED_TMDB_LIST_IDS = ['8687293'];
 
 /**
  * Mirroring into TMDB's built-in "My Watchlist" is what Stremio's TMDB addons read, so it is on
@@ -17,18 +17,17 @@ export function saveTmdbAccountWatchlistEnabled(enabled: boolean): void {
   localStorage.setItem(TMDB_ACCOUNT_WATCHLIST_KEY, String(enabled));
 }
 
-const LIST_DEFAULT_MIGRATION_KEY = 'streampulse_tmdb_list_default_migrated';
-
 /**
- * Earlier builds pre-filled list #8687293, which Stremio's TMDB catalogs cannot read, so clear
- * that stored value once and let the account watchlist be the destination instead.
+ * Earlier builds pre-filled a custom list that Stremio's TMDB catalogs cannot read and that no
+ * longer exists on TMDB, so writes to it would 404. Drop any stored reference to it.
  */
 export function migrateDefaultTmdbListId(): void {
-  if (localStorage.getItem(LIST_DEFAULT_MIGRATION_KEY) === 'done') return;
-  if (localStorage.getItem(TMDB_LIST_ID_KEY) === EXAMPLE_TMDB_LIST_ID) {
-    localStorage.removeItem(TMDB_LIST_ID_KEY);
+  for (const key of [TMDB_LIST_ID_KEY, TMDB_MOVIE_LIST_ID_KEY]) {
+    const stored = localStorage.getItem(key);
+    if (stored && RETIRED_TMDB_LIST_IDS.some((id) => stored.includes(id))) {
+      localStorage.removeItem(key);
+    }
   }
-  localStorage.setItem(LIST_DEFAULT_MIGRATION_KEY, 'done');
 }
 
 /** Blank means "account watchlist only": no custom list is written. */

@@ -29,7 +29,7 @@ import {
   migrateDefaultTmdbListId,
 } from './tmdbSettings';
 import { getStoredTmdbToken } from './tmdbToken';
-import { fetchTmdbDiscover, importTmdbTitle } from './tmdbClient';
+import { fetchTmdbDiscover, importTmdbTitle, liveSearchTitles } from './tmdbClient';
 import {
   SlidersHorizontal,
   Flame,
@@ -58,6 +58,9 @@ const EMPTY_BROWSE: Record<BrowseKind, BrowseState> = {
   tv: { results: [], page: 0, totalPages: 1, attempted: false, error: null },
   movie: { results: [], page: 0, totalPages: 1, attempted: false, error: null },
 };
+
+/** A query shorter than this matches too much to be worth a TMDB round trip. */
+const MIN_TAB_SEARCH_LENGTH = 2;
 
 export default function App() {
   const [seriesList, setSeriesList] = useState<Series[]>([]);
@@ -168,11 +171,46 @@ export default function App() {
     void loadBrowsePage(browseKind, 1);
   }, [browseKind, browse, browseLoading, loadBrowsePage]);
 
+  /**
+   * The header box filters the loaded grid, which only ever holds a few pages of TMDB's catalog, so
+   * on the Series and Movies tabs the query is also sent to TMDB search and those hits replace the
+   * discover rows. Without this, searching a title that is not on page one returns nothing.
+   */
+  const [tabSearch, setTabSearch] = useState<{ results: Series[]; loading: boolean }>({
+    results: [],
+    loading: false,
+  });
+  const trimmedQuery = searchQuery.trim();
+  const isTabSearching = !!browseKind && trimmedQuery.length >= MIN_TAB_SEARCH_LENGTH;
+
+  useEffect(() => {
+    if (!isTabSearching || !browseKind) {
+      setTabSearch({ results: [], loading: false });
+      return;
+    }
+    let cancelled = false;
+    setTabSearch((prev) => ({ ...prev, loading: true }));
+    const timer = window.setTimeout(async () => {
+      try {
+        const { results } = await liveSearchTitles(trimmedQuery, browseKind);
+        if (!cancelled) setTabSearch({ results, loading: false });
+      } catch (err) {
+        console.warn('Tab search failed:', err);
+        if (!cancelled) setTabSearch({ results: [], loading: false });
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [browseKind, isTabSearching, trimmedQuery]);
+
   const browseState = browseKind ? browse[browseKind] : null;
   /** Discover rows carry no provider data, so paging is pointless while a network filter is on. */
   const canLoadMoreBrowse =
     !!browseState &&
     !browseState.error &&
+    !isTabSearching &&
     selectedProvider === 'all' &&
     browseState.page < browseState.totalPages;
 
@@ -372,17 +410,24 @@ export default function App() {
    */
   const browseSuggestions = useMemo(() => {
     if (!browseKind || selectedProvider !== 'all') return [];
+    const source = isTabSearching ? tabSearch.results : browse[browseKind].results;
     const knownIds = new Set(seriesList.map((s) => s.id));
     const knownTmdb = new Set(
       seriesList.filter((s) => s.tmdbId).map((s) => `${s.mediaType ?? 'tv'}-${s.tmdbId}`)
     );
-    return browse[browseKind].results.filter(
+    return source.filter(
       (s) => !knownIds.has(s.id) && !knownTmdb.has(`${s.mediaType ?? 'tv'}-${s.tmdbId}`)
     );
-  }, [browse, browseKind, selectedProvider, seriesList]);
+  }, [browse, browseKind, isTabSearching, tabSearch.results, selectedProvider, seriesList]);
 
   // Filtered series list based on active options
   const filteredSeries = useMemo(() => {
+    /**
+     * TMDB already matched these against the query, and a hit is worth showing even when it is not
+     * a currently-airing season, so they bypass the tab's own category and text filters.
+     */
+    const searchHitIds = isTabSearching ? new Set(browseSuggestions.map((s) => s.id)) : new Set<string>();
+
     // Movies live in their own tab, while classics can include older films.
     let list = [...seriesList, ...browseSuggestions].filter((s) =>
       activeCategory === 'movies' || activeCategory === 'watchlist' || activeCategory === 'classics'
@@ -392,7 +437,7 @@ export default function App() {
 
     // Category Filter
     if (activeCategory === 'now_playing') {
-      list = list.filter((s) => s.isNowPlaying);
+      list = list.filter((s) => s.isNowPlaying || searchHitIds.has(s.id));
     } else if (activeCategory === 'movies') {
       list = list.filter((s) => s.mediaType === 'movie');
     } else if (activeCategory === 'upcoming') {
@@ -422,6 +467,7 @@ export default function App() {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter(
         (s) =>
+          searchHitIds.has(s.id) ||
           s.title.toLowerCase().includes(q) ||
           s.synopsis.toLowerCase().includes(q) ||
           s.genres.some((g) => g.toLowerCase().includes(q)) ||
@@ -453,6 +499,7 @@ export default function App() {
   }, [
     seriesList,
     browseSuggestions,
+    isTabSearching,
     activeCategory,
     selectedProvider,
     selectedGenre,
@@ -629,10 +676,15 @@ export default function App() {
                     {isMoviesView ? 'Movies' : 'Series'} ({filteredSeries.length})
                   </span>
                 </h2>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  {isMoviesView
-                    ? 'Popular films from TMDB plus everything in your catalog — bookmark any card to favorite it'
-                    : 'Popular series from TMDB plus your tracked shows — bookmark any card to favorite it'}
+                <p className="text-xs text-zinc-400 mt-0.5 flex items-center gap-1.5">
+                  {tabSearch.loading && <Loader2 className="w-3 h-3 animate-spin" />}
+                  <span>
+                    {isTabSearching
+                      ? `TMDB ${isMoviesView ? 'movie' : 'series'} results for "${trimmedQuery}" plus matches in your catalog`
+                      : isMoviesView
+                        ? 'Popular films from TMDB plus everything in your catalog — bookmark any card to favorite it'
+                        : 'Popular series from TMDB plus your tracked shows — bookmark any card to favorite it'}
+                  </span>
                 </p>
               </div>
             </div>
@@ -661,9 +713,13 @@ export default function App() {
                   {isMoviesView ? 'No Movies Found' : 'No Series Found'}
                 </h3>
                 <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                  {isMoviesView
-                    ? 'Nothing matched. Popular films load from TMDB — add a TMDB key via "Add from TMDB" if this stays empty.'
-                    : 'No series match your current filter combination. Try clearing filters or searching for another title.'}
+                  {selectedProvider !== 'all'
+                    ? 'A streaming-network filter is active, which limits this tab to titles already in your catalog. Reset it to "All Providers" to see TMDB results.'
+                    : isTabSearching
+                      ? `TMDB returned no ${isMoviesView ? 'movies' : 'series'} for "${trimmedQuery}". Check the spelling, or drop the filters below.`
+                      : isMoviesView
+                        ? 'Nothing matched. Popular films load from TMDB — add a TMDB key via "Add from TMDB" if this stays empty.'
+                        : 'No series match your current filter combination. Try clearing filters or searching for another title.'}
                 </p>
                 <button
                   onClick={() => {
