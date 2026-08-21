@@ -20,6 +20,7 @@ import {
 import { Series } from '../types';
 import { getStoredTmdbToken, storeTmdbToken } from '../tmdbToken';
 import {
+  DEFAULT_TMDB_LIST_ID,
   clearTmdbWriteToken,
   getTmdbAccountWatchlistEnabled,
   getTmdbListId,
@@ -68,7 +69,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
   const [activeTab, setActiveTab] = useState<'sync' | 'nuvio' | 'shows'>('sync');
 
   // Clean numeric List ID
-  const cleanListId = tmdbListId.trim().replace(/[^0-9]/g, '') || '8687068';
+  const cleanListId = tmdbListId.trim().replace(/[^0-9]/g, '') || DEFAULT_TMDB_LIST_ID;
   const cleanMovieListId = tmdbMovieListId.trim().replace(/[^0-9]/g, '');
   const movieCount = watchlistedSeries.filter((series) => series.mediaType === 'movie').length;
   const showCount = watchlistedSeries.length - movieCount;
@@ -580,7 +581,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
                   )}
                 </div>
                 <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  On your open TMDB list page (<strong>List #{cleanListId || '8687068'}</strong>), click the <strong>"Edit"</strong> button right under the title. You can search and add any show with 1 click:
+                  On your open TMDB list page (<strong>List #{cleanListId || DEFAULT_TMDB_LIST_ID}</strong>), click the <strong>"Edit"</strong> button right under the title. You can search and add any show with 1 click:
                 </p>
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {watchlistedSeries.map((s) => (
@@ -676,15 +677,15 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
                 <div className="p-3 bg-zinc-900/60 rounded-xl border border-zinc-800 space-y-1.5">
                   <div className="font-bold text-zinc-300 flex items-center gap-1.5">
                     <Check className="w-3.5 h-3.5 text-zinc-500" />
-                    <span>Method 2: Custom List ID (List #8687068)</span>
+                    <span>Method 2: Custom List ID (List #{cleanListId})</span>
                   </div>
                   <p className="text-[11px] text-zinc-400">
                     If using CyberFlix custom list catalog, you can also paste your TMDB custom list ID:
                   </p>
                   <div className="flex items-center gap-2 bg-zinc-950 p-2 rounded-lg border border-zinc-800 font-mono text-[11px] text-zinc-300">
-                    <span>8687068</span>
+                    <span>{cleanListId}</span>
                     <button
-                      onClick={() => handleCopy('8687068', 'listid')}
+                      onClick={() => handleCopy(cleanListId, 'listid')}
                       className="ml-auto text-zinc-400 hover:text-white"
                     >
                       {copiedUrl === 'listid' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
