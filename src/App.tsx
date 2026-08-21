@@ -420,14 +420,30 @@ export default function App() {
     );
   }, [browse, browseKind, isTabSearching, tabSearch.results, selectedProvider, seriesList]);
 
+  /**
+   * Ids of the current TMDB search hits, including the catalog record a hit was deduped into.
+   * TMDB already matched these against the query, so they bypass the tab's own category and text
+   * filters — a hit is worth showing even when it is not a currently-airing season, and a hit that
+   * is already in the catalog (or was just imported by favoriting it) must not drop out.
+   */
+  const searchHitIds = useMemo(() => {
+    if (!isTabSearching) return new Set<string>();
+    const catalogIdByTmdb = new Map(
+      seriesList
+        .filter((s) => s.tmdbId)
+        .map((s) => [`${s.mediaType ?? 'tv'}-${s.tmdbId}`, s.id] as const)
+    );
+    const ids = new Set<string>();
+    for (const hit of tabSearch.results) {
+      ids.add(hit.id);
+      const catalogId = catalogIdByTmdb.get(`${hit.mediaType ?? 'tv'}-${hit.tmdbId}`);
+      if (catalogId) ids.add(catalogId);
+    }
+    return ids;
+  }, [isTabSearching, tabSearch.results, seriesList]);
+
   // Filtered series list based on active options
   const filteredSeries = useMemo(() => {
-    /**
-     * TMDB already matched these against the query, and a hit is worth showing even when it is not
-     * a currently-airing season, so they bypass the tab's own category and text filters.
-     */
-    const searchHitIds = isTabSearching ? new Set(browseSuggestions.map((s) => s.id)) : new Set<string>();
-
     // Movies live in their own tab, while classics can include older films.
     let list = [...seriesList, ...browseSuggestions].filter((s) =>
       activeCategory === 'movies' || activeCategory === 'watchlist' || activeCategory === 'classics'
@@ -499,7 +515,7 @@ export default function App() {
   }, [
     seriesList,
     browseSuggestions,
-    isTabSearching,
+    searchHitIds,
     activeCategory,
     selectedProvider,
     selectedGenre,
