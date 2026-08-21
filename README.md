@@ -51,22 +51,25 @@ In the static build:
 - AI season intelligence and the Bingecat/Stremio addon are unavailable and report as much,
   since they need the server.
 
-### Syncing your watchlist to a TMDB list
+### Syncing your watchlist to TMDB
 
-Writing to a TMDB list needs your account's permission, not just an API key:
+Sync targets TMDB's built-in account watchlist (`themoviedb.org/u/<user>/watchlist`) by default;
+the list ID fields are optional extras. Writing to TMDB needs your account's permission, not just
+an API key:
 
 1. Paste your **API Read Access Token** (themoviedb.org/settings/api) into the TMDB modal.
 2. Click **1-Click TMDB Authorize** and approve the request on themoviedb.org.
 3. Come back and click **Complete Sync** — the write token is kept in `localStorage` so later
    syncs are one click.
 
-The list StreamPulse writes to is a normal TMDB *list*, which is not the same thing as TMDB's
-built-in "My Watchlist". Nuvio can read a list directly by its numeric ID, but a Stremio TMDB
-catalog labelled "TMDB Watchlist" exposes your account watchlist instead. **Also mirror to TMDB
-"My Watchlist"** is therefore on by default: syncs and un-favorites also write to the account
-watchlist (`POST /3/account/{id}/watchlist`), which the same one-click approval covers — the v4
-user token is converted into a v3 session. The mirror is best effort — if it fails, the list write
-still stands and the error shows up in the sync status.
+A TMDB *list* (`themoviedb.org/list/<id>`) is not the same thing as TMDB's built-in
+"My Watchlist". Nuvio can read a list directly by its numeric ID, but a Stremio TMDB catalog
+labelled "TMDB Watchlist" exposes your account watchlist instead, so **Also mirror to TMDB
+"My Watchlist"** is on by default and both list ID fields may be left blank: syncs and
+un-favorites then only write the account watchlist (`POST /3/account/{id}/watchlist`), which the
+same one-click approval covers — the v4 user token is converted into a v3 session. Fill in a list
+ID to keep a custom list updated alongside it; that write is separate, and a failing account
+watchlist mirror shows up in the sync status without undoing it.
 
 To surface the StreamPulse list itself in Stremio (instead of the account watchlist), addons such
 as [aiometadata](https://github.com/cedya77/aiometadata) can add a list as its own catalog:

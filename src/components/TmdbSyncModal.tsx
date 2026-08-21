@@ -20,7 +20,7 @@ import {
 import { Series } from '../types';
 import { getStoredTmdbToken, storeTmdbToken } from '../tmdbToken';
 import {
-  DEFAULT_TMDB_LIST_ID,
+  EXAMPLE_TMDB_LIST_ID,
   clearTmdbWriteToken,
   getTmdbAccountWatchlistEnabled,
   getTmdbListId,
@@ -68,8 +68,8 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
   const [isAuthorizing, setIsAuthorizing] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'sync' | 'nuvio' | 'shows'>('sync');
 
-  // Clean numeric List ID
-  const cleanListId = tmdbListId.trim().replace(/[^0-9]/g, '') || DEFAULT_TMDB_LIST_ID;
+  // Clean numeric List ID; blank keeps the sync on the account watchlist only.
+  const cleanListId = tmdbListId.trim().replace(/[^0-9]/g, '');
   const cleanMovieListId = tmdbMovieListId.trim().replace(/[^0-9]/g, '');
   const movieCount = watchlistedSeries.filter((series) => series.mediaType === 'movie').length;
   const showCount = watchlistedSeries.length - movieCount;
@@ -194,10 +194,11 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
 
   const handleSyncToTmdb = async () => {
     handleSaveSettings();
-    if (!tmdbListId.trim()) {
+    if (!cleanListId && !cleanMovieListId && !syncAccountWatchlist) {
       setSyncStatus({
         success: false,
-        message: 'Please enter your TMDB List ID or List URL below.',
+        message:
+          'Nothing to sync to: enter a TMDB List ID or tick "Also mirror to TMDB My Watchlist".',
       });
       return;
     }
@@ -399,7 +400,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    placeholder="e.g. 8249152 or https://www.themoviedb.org/list/8249152"
+                    placeholder={`Optional: e.g. ${EXAMPLE_TMDB_LIST_ID} or https://www.themoviedb.org/list/${EXAMPLE_TMDB_LIST_ID}`}
                     value={tmdbListId}
                     onChange={(e) => setTmdbListId(e.target.value)}
                     className="flex-1 bg-zinc-900 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-500 focus:outline-hidden focus:border-teal-500 transition-all font-mono"
@@ -415,7 +416,8 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
                   </a>
                 </div>
                 <p className="text-[11px] text-zinc-400 mt-1">
-                  Create a public list at <strong>themoviedb.org</strong> and paste its list ID or link here.
+                  Leave blank to sync to your TMDB account watchlist only (what Stremio reads). To also keep a
+                  custom list, create one at <strong>themoviedb.org</strong> and paste its list ID or link here.
                 </p>
               </div>
 
@@ -554,7 +556,9 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
                     <p className="font-semibold">{syncStatus.message}</p>
                     {syncStatus.success && (
                       <p className="text-[11px] text-emerald-400/80">
-                        Your TMDB list is now populated. You can connect it directly to Nuvio or Stremio in Tab 2!
+                        {cleanListId || cleanMovieListId
+                          ? 'Your TMDB list is now populated. You can connect it directly to Nuvio or Stremio in Tab 2!'
+                          : 'Your TMDB account watchlist is now populated, which is what Stremio\u2019s TMDB catalogs read.'}
                       </p>
                     )}
                   </div>
@@ -562,26 +566,25 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
               )}
 
               {/* 10-Second Quick Add Helper Box */}
+              {cleanListId && (
               <div className="p-3.5 rounded-xl bg-zinc-900/90 border border-zinc-800 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="font-bold text-xs text-white flex items-center gap-1.5">
                     <Zap className="w-3.5 h-3.5 text-amber-400" />
                     <span>Quick Add via TMDB Website (No API Key Required)</span>
                   </div>
-                  {cleanListId && (
-                    <a
-                      href={`https://www.themoviedb.org/list/${cleanListId}/edit`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[11px] text-teal-300 hover:underline flex items-center gap-1 font-semibold"
-                    >
-                      <span>Open TMDB List Editor</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
+                  <a
+                    href={`https://www.themoviedb.org/list/${cleanListId}/edit`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-teal-300 hover:underline flex items-center gap-1 font-semibold"
+                  >
+                    <span>Open TMDB List Editor</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
                 <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  On your open TMDB list page (<strong>List #{cleanListId || DEFAULT_TMDB_LIST_ID}</strong>), click the <strong>"Edit"</strong> button right under the title. You can search and add any show with 1 click:
+                  On your open TMDB list page (<strong>List #{cleanListId}</strong>), click the <strong>"Edit"</strong> button right under the title. You can search and add any show with 1 click:
                 </p>
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {watchlistedSeries.map((s) => (
@@ -599,6 +602,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
                   ))}
                 </div>
               </div>
+              )}
             </div>
           </div>
         )}
@@ -674,6 +678,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
                 </div>
 
                 {/* Custom List Method */}
+                {cleanListId && (
                 <div className="p-3 bg-zinc-900/60 rounded-xl border border-zinc-800 space-y-1.5">
                   <div className="font-bold text-zinc-300 flex items-center gap-1.5">
                     <Check className="w-3.5 h-3.5 text-zinc-500" />
@@ -692,6 +697,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
                     </button>
                   </div>
                 </div>
+                )}
               </div>
             </div>
           </div>

@@ -26,6 +26,7 @@ import {
   getTmdbListId,
   getTmdbMovieListId,
   getTmdbWriteToken,
+  migrateDefaultTmdbListId,
 } from './tmdbSettings';
 import { getStoredTmdbToken } from './tmdbToken';
 import {
@@ -70,6 +71,10 @@ export default function App() {
       return ['severance', 'the-last-of-us', 'stranger-things'];
     }
   });
+
+  useEffect(() => {
+    migrateDefaultTmdbListId();
+  }, []);
 
   useEffect(() => {
     try {
@@ -120,7 +125,8 @@ export default function App() {
     const tvListId = cleanTmdbListId(getTmdbListId());
     const movieListId = cleanTmdbListId(getTmdbMovieListId());
     const configuredListId = series.mediaType === 'movie' ? movieListId || tvListId : tvListId;
-    if (!writeToken || !configuredListId) return;
+    const mirrorAccountWatchlist = getTmdbAccountWatchlistEnabled();
+    if (!writeToken || (!configuredListId && !mirrorAccountWatchlist)) return;
 
     try {
       const response = await apiFetch('/api/tmdb/remove-from-list', {
@@ -131,7 +137,7 @@ export default function App() {
           movieListId,
           apiKey: writeToken,
           readToken: getStoredTmdbToken(),
-          syncAccountWatchlist: getTmdbAccountWatchlistEnabled(),
+          syncAccountWatchlist: mirrorAccountWatchlist,
           items: [{
             id: series.id,
             title: series.title,
@@ -155,7 +161,9 @@ export default function App() {
         : [];
       const destination = listIds.length
         ? listIds.map((listId: string) => `#${listId}`).join(' and ')
-        : `#${configuredListId}`;
+        : configuredListId
+          ? `#${configuredListId}`
+          : '';
       const accountWatchlistNote = data.accountWatchlistError
         ? ` Account watchlist: ${data.accountWatchlistError}`
         : data.accountWatchlist
@@ -163,7 +171,9 @@ export default function App() {
           : '';
       showTmdbRemovalStatus(
         'success',
-        `Removed ${series.title} from TMDB list ${destination}.${accountWatchlistNote}`
+        destination
+          ? `Removed ${series.title} from TMDB list ${destination}.${accountWatchlistNote}`
+          : `Removed ${series.title} from your TMDB account watchlist.`
       );
     } catch (error) {
       showTmdbRemovalStatus(
