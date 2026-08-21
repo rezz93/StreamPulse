@@ -61,9 +61,16 @@ Writing to a TMDB list needs your account's permission, not just an API key:
    syncs are one click.
 
 The list StreamPulse writes to is a normal TMDB *list*, which is not the same thing as TMDB's
-built-in "My Watchlist". Nuvio can read a list directly by its numeric ID, but Stremio's TMDB
-addon exposes your account watchlist instead. Tick **Also mirror to TMDB "My Watchlist"** in the
-TMDB modal to have syncs and un-favorites also write to the account watchlist
-(`POST /3/account/{id}/watchlist`), which the same one-click approval covers: the v4 user token is
-converted into a v3 session. The mirror is best effort — if it fails, the list write still stands
-and the error shows up in the sync status.
+built-in "My Watchlist". Nuvio can read a list directly by its numeric ID, but a Stremio TMDB
+catalog labelled "TMDB Watchlist" exposes your account watchlist instead. **Also mirror to TMDB
+"My Watchlist"** is therefore on by default: syncs and un-favorites also write to the account
+watchlist (`POST /3/account/{id}/watchlist`), which the same one-click approval covers — the v4
+user token is converted into a v3 session. The mirror is best effort — if it fails, the list write
+still stands and the error shows up in the sync status.
+
+To surface the StreamPulse list itself in Stremio (instead of the account watchlist), addons such
+as [aiometadata](https://github.com/cedya77/aiometadata) can add a list as its own catalog:
+in its configure page, TMDB Integration → paste `https://www.themoviedb.org/list/<list id>` →
+Preview → Add. It fetches list contents through TMDB's v3 `/list/{id}` endpoint, so a list that
+endpoint cannot return will come back empty and the account-watchlist mirror stays the reliable
+path.

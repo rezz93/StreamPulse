@@ -460,8 +460,8 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
                     Also mirror to TMDB &ldquo;My Watchlist&rdquo;
                   </span>
                   <span className="block text-[11px] text-zinc-400 mt-0.5">
-                    Stremio&rsquo;s TMDB addon reads your account watchlist, not custom lists. Turn this on to keep
-                    both in sync.
+                    On by default: Stremio&rsquo;s TMDB catalogs (aiometadata included) read your account
+                    watchlist, not custom lists. Leave this on to keep both in sync.
                   </span>
                 </span>
               </label>
