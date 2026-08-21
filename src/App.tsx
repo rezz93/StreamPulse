@@ -22,10 +22,12 @@ import { TmdbBrowseModal } from './components/TmdbBrowseModal';
 import { cleanTmdbListId } from '../shared/tmdbListSync';
 import {
   clearTmdbWriteToken,
+  getTmdbAccountWatchlistEnabled,
   getTmdbListId,
   getTmdbMovieListId,
   getTmdbWriteToken,
 } from './tmdbSettings';
+import { getStoredTmdbToken } from './tmdbToken';
 import {
   SlidersHorizontal,
   Flame,
@@ -128,6 +130,8 @@ export default function App() {
           listId: tvListId,
           movieListId,
           apiKey: writeToken,
+          readToken: getStoredTmdbToken(),
+          syncAccountWatchlist: getTmdbAccountWatchlistEnabled(),
           items: [{
             id: series.id,
             title: series.title,
@@ -152,7 +156,15 @@ export default function App() {
       const destination = listIds.length
         ? listIds.map((listId: string) => `#${listId}`).join(' and ')
         : `#${configuredListId}`;
-      showTmdbRemovalStatus('success', `Removed ${series.title} from TMDB list ${destination}.`);
+      const accountWatchlistNote = data.accountWatchlistError
+        ? ` Account watchlist: ${data.accountWatchlistError}`
+        : data.accountWatchlist
+          ? ' Also removed from your TMDB account watchlist.'
+          : '';
+      showTmdbRemovalStatus(
+        'success',
+        `Removed ${series.title} from TMDB list ${destination}.${accountWatchlistNote}`
+      );
     } catch (error) {
       showTmdbRemovalStatus(
         'error',
