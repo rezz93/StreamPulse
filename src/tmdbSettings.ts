@@ -2,7 +2,7 @@ export const TMDB_LIST_ID_KEY = 'streampulse_tmdb_list_id';
 export const TMDB_MOVIE_LIST_ID_KEY = 'streampulse_tmdb_movie_list_id';
 export const TMDB_WRITE_TOKEN_KEY = 'streampulse_tmdb_write_token';
 export const TMDB_ACCOUNT_WATCHLIST_KEY = 'streampulse_tmdb_account_watchlist';
-export const DEFAULT_TMDB_LIST_ID = '8687068';
+export const DEFAULT_TMDB_LIST_ID = '8687293';
 
 /** Mirroring into TMDB's built-in "My Watchlist" is what Stremio's TMDB addon reads. */
 export function getTmdbAccountWatchlistEnabled(): boolean {
