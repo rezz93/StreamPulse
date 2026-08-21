@@ -49,11 +49,14 @@ interface BrowseState {
   results: Series[];
   page: number;
   totalPages: number;
+  /** Set once a request finished, success or failure, so a failed tab is not retried in a loop. */
+  attempted: boolean;
+  error: string | null;
 }
 
 const EMPTY_BROWSE: Record<BrowseKind, BrowseState> = {
-  tv: { results: [], page: 0, totalPages: 1 },
-  movie: { results: [], page: 0, totalPages: 1 },
+  tv: { results: [], page: 0, totalPages: 1, attempted: false, error: null },
+  movie: { results: [], page: 0, totalPages: 1, attempted: false, error: null },
 };
 
 export default function App() {
@@ -80,7 +83,6 @@ export default function App() {
   // Popularity-ordered TMDB pages that back the Series and Movies browse tabs
   const [browse, setBrowse] = useState<Record<BrowseKind, BrowseState>>(EMPTY_BROWSE);
   const [browseLoading, setBrowseLoading] = useState(false);
-  const [browseError, setBrowseError] = useState<string | null>(null);
 
   // Watchlist persistence in localStorage & server sync for Bingecat Addon
   const [watchlist, setWatchlist] = useState<string[]>(() => {
@@ -138,7 +140,7 @@ export default function App() {
 
   const loadBrowsePage = useCallback(async (kind: BrowseKind, page: number) => {
     setBrowseLoading(true);
-    setBrowseError(null);
+    setBrowse((prev) => ({ ...prev, [kind]: { ...prev[kind], attempted: true, error: null } }));
     try {
       const data = await fetchTmdbDiscover(kind, page);
       setBrowse((prev) => {
@@ -146,6 +148,7 @@ export default function App() {
         return {
           ...prev,
           [kind]: {
+            ...prev[kind],
             results: [...prev[kind].results, ...data.results.filter((s) => !known.has(s.id))],
             page: data.page,
             totalPages: data.totalPages,
@@ -153,16 +156,29 @@ export default function App() {
         };
       });
     } catch (err) {
-      setBrowseError(err instanceof Error ? err.message : 'Could not load titles from TMDB.');
+      const error = err instanceof Error ? err.message : 'Could not load titles from TMDB.';
+      setBrowse((prev) => ({ ...prev, [kind]: { ...prev[kind], error } }));
     } finally {
       setBrowseLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (!browseKind || browse[browseKind].page > 0 || browseLoading) return;
+    if (!browseKind || browse[browseKind].attempted || browseLoading) return;
     void loadBrowsePage(browseKind, 1);
   }, [browseKind, browse, browseLoading, loadBrowsePage]);
+
+  const browseState = browseKind ? browse[browseKind] : null;
+  /** Discover rows carry no provider data, so paging is pointless while a network filter is on. */
+  const canLoadMoreBrowse =
+    !!browseState &&
+    !browseState.error &&
+    selectedProvider === 'all' &&
+    browseState.page < browseState.totalPages;
+
+  const retryBrowse = () => {
+    if (browseKind) void loadBrowsePage(browseKind, browse[browseKind].page + 1);
+  };
 
   const showTmdbRemovalStatus = (type: 'success' | 'error', message: string) => {
     setTmdbRemovalStatus({ type, message });
@@ -662,16 +678,25 @@ export default function App() {
               </div>
             )}
 
-            {browseError && (
-              <p className="text-xs text-amber-300 bg-amber-950/30 border border-amber-500/30 rounded-xl px-3 py-2">
-                {browseError} Add a TMDB key via "Add from TMDB" to browse the full catalog.
-              </p>
+            {browseState?.error && (
+              <div className="text-xs text-amber-300 bg-amber-950/30 border border-amber-500/30 rounded-xl px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  {browseState.error} Add a TMDB key via "Add from TMDB" to browse the full catalog.
+                </span>
+                <button
+                  onClick={retryBrowse}
+                  disabled={browseLoading}
+                  className="px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 disabled:opacity-60 font-semibold transition-all cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {browseLoading ? 'Retrying...' : 'Retry'}
+                </button>
+              </div>
             )}
 
-            {browseKind && !browseError && browse[browseKind].page < browse[browseKind].totalPages && (
+            {canLoadMoreBrowse && (
               <div className="flex justify-center">
                 <button
-                  onClick={() => void loadBrowsePage(browseKind, browse[browseKind].page + 1)}
+                  onClick={retryBrowse}
                   disabled={browseLoading}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 disabled:opacity-60 text-zinc-200 border border-zinc-700/70 text-xs font-semibold transition-all cursor-pointer disabled:cursor-not-allowed"
                 >
