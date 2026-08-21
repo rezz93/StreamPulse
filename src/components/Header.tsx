@@ -104,7 +104,7 @@ export const Header: React.FC<HeaderProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="Search series, cast, genre, network..."
+                placeholder="Filter this tab by title, cast, genre..."
                 className="w-full bg-zinc-900/90 border border-zinc-800 text-zinc-200 placeholder-zinc-500 rounded-xl pl-9.5 pr-4 py-2 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
               />
               {searchQuery && (
@@ -121,11 +121,11 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="btn-global-lookup"
               onClick={onOpenLiveSearch}
-              title="Search worldwide TV database (TVMaze API)"
+              title="Search TMDB for any movie or series"
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-indigo-300 border border-zinc-700/60 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap"
             >
               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="hidden sm:inline">Global TV Finder</span>
+              <span className="hidden sm:inline">Find Movies & Series</span>
             </button>
 
             {/* Add titles from TMDB button */}
