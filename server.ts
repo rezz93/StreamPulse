@@ -23,6 +23,7 @@ import {
   syncItemsToTmdbLists,
   TmdbListSyncItem,
 } from "./shared/tmdbListSync";
+import { mirrorTmdbAccountWatchlist } from "./shared/tmdbAccountWatchlist";
 import { searchTvmazeShows } from "./shared/tvmazeService";
 import { Series, StreamingProviderId } from "./src/types";
 
@@ -383,18 +384,15 @@ async function startServer() {
   // Step 2: Exchange approved request_token for Write Access Token & Sync
   app.post("/api/tmdb/auth-complete", async (req: Request, res: Response) => {
     try {
-      const { readToken, requestToken, listId, movieListId, watchlistSeries } = req.body;
+      const { readToken, requestToken, listId, movieListId, watchlistSeries, syncAccountWatchlist } = req.body;
       const { accessToken, accountId } = await completeTmdbWriteAuth(
         String(readToken ?? ""),
         String(requestToken ?? "")
       );
-      const sync = await syncItemsToTmdbLists(
-        listId,
-        movieListId,
-        accessToken,
-        withKnownTmdbIds(watchlistSeries)
-      );
-      res.json({ success: true, userAccessToken: accessToken, accountId, ...sync });
+      const items = withKnownTmdbIds(watchlistSeries);
+      const sync = await syncItemsToTmdbLists(listId, movieListId, accessToken, items);
+      const mirror = await mirrorTmdbAccountWatchlist(syncAccountWatchlist, readToken, accessToken, items, true);
+      res.json({ success: true, userAccessToken: accessToken, accountId, ...sync, ...mirror });
     } catch (err) {
       sendTmdbError(res, err);
     }
@@ -402,14 +400,11 @@ async function startServer() {
 
   app.post("/api/tmdb/sync-to-list", async (req: Request, res: Response) => {
     try {
-      const { listId, movieListId, apiKey, watchlistSeries } = req.body;
-      const sync = await syncItemsToTmdbLists(
-        listId,
-        movieListId,
-        String(apiKey ?? ""),
-        withKnownTmdbIds(watchlistSeries)
-      );
-      res.json({ success: true, listId: cleanTmdbListId(listId), ...sync });
+      const { listId, movieListId, apiKey, readToken, watchlistSeries, syncAccountWatchlist } = req.body;
+      const items = withKnownTmdbIds(watchlistSeries);
+      const sync = await syncItemsToTmdbLists(listId, movieListId, String(apiKey ?? ""), items);
+      const mirror = await mirrorTmdbAccountWatchlist(syncAccountWatchlist, readToken, apiKey, items, true);
+      res.json({ success: true, listId: cleanTmdbListId(listId), ...sync, ...mirror });
     } catch (err) {
       sendTmdbError(res, err);
     }
@@ -417,14 +412,11 @@ async function startServer() {
 
   app.post("/api/tmdb/remove-from-list", async (req: Request, res: Response) => {
     try {
-      const { listId, movieListId, apiKey, items, watchlistSeries } = req.body;
-      const removal = await removeItemsFromTmdbLists(
-        listId,
-        movieListId,
-        String(apiKey ?? ""),
-        withKnownTmdbIds(items ?? watchlistSeries)
-      );
-      res.json({ success: true, ...removal });
+      const { listId, movieListId, apiKey, readToken, items, watchlistSeries, syncAccountWatchlist } = req.body;
+      const syncItems = withKnownTmdbIds(items ?? watchlistSeries);
+      const removal = await removeItemsFromTmdbLists(listId, movieListId, String(apiKey ?? ""), syncItems);
+      const mirror = await mirrorTmdbAccountWatchlist(syncAccountWatchlist, readToken, apiKey, syncItems, false);
+      res.json({ success: true, ...removal, ...mirror });
     } catch (err) {
       sendTmdbError(res, err);
     }

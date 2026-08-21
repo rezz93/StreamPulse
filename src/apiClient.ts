@@ -8,6 +8,7 @@ import {
   syncItemsToTmdbLists,
   TmdbListSyncItem,
 } from '../shared/tmdbListSync';
+import { mirrorTmdbAccountWatchlist } from '../shared/tmdbAccountWatchlist';
 import { searchTvmazeShows } from '../shared/tvmazeService';
 import { getStoredTmdbToken } from './tmdbToken';
 import { Series } from './types';
@@ -131,7 +132,14 @@ async function handleStatically(url: URL, init?: RequestInit): Promise<Response>
     const { accessToken, accountId } = await completeTmdbWriteAuth(body.readToken, body.requestToken);
     const items = (body.watchlistSeries ?? []) as TmdbListSyncItem[];
     const sync = await syncItemsToTmdbLists(body.listId, body.movieListId, accessToken, items);
-    return json({ success: true, userAccessToken: accessToken, accountId, ...sync });
+    const mirror = await mirrorTmdbAccountWatchlist(
+      body.syncAccountWatchlist,
+      body.readToken,
+      accessToken,
+      items,
+      true
+    );
+    return json({ success: true, userAccessToken: accessToken, accountId, ...sync, ...mirror });
   }
   if (pathname === '/api/tmdb/sync-to-list' && method === 'POST') {
     const items = (body.watchlistSeries ?? []) as TmdbListSyncItem[];
@@ -139,6 +147,7 @@ async function handleStatically(url: URL, init?: RequestInit): Promise<Response>
       success: true,
       listId: cleanTmdbListId(body.listId),
       ...(await syncItemsToTmdbLists(body.listId, body.movieListId, body.apiKey, items)),
+      ...(await mirrorTmdbAccountWatchlist(body.syncAccountWatchlist, body.readToken, body.apiKey, items, true)),
     });
   }
   if (pathname === '/api/tmdb/remove-from-list' && method === 'POST') {
@@ -146,6 +155,7 @@ async function handleStatically(url: URL, init?: RequestInit): Promise<Response>
     return json({
       success: true,
       ...(await removeItemsFromTmdbLists(body.listId, body.movieListId, body.apiKey, items)),
+      ...(await mirrorTmdbAccountWatchlist(body.syncAccountWatchlist, body.readToken, body.apiKey, items, false)),
     });
   }
   if (pathname === '/api/tmdb/create-list' && method === 'POST') {

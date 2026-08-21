@@ -59,3 +59,11 @@ Writing to a TMDB list needs your account's permission, not just an API key:
 2. Click **1-Click TMDB Authorize** and approve the request on themoviedb.org.
 3. Come back and click **Complete Sync** — the write token is kept in `localStorage` so later
    syncs are one click.
+
+The list StreamPulse writes to is a normal TMDB *list*, which is not the same thing as TMDB's
+built-in "My Watchlist". Nuvio can read a list directly by its numeric ID, but Stremio's TMDB
+addon exposes your account watchlist instead. Tick **Also mirror to TMDB "My Watchlist"** in the
+TMDB modal to have syncs and un-favorites also write to the account watchlist
+(`POST /3/account/{id}/watchlist`), which the same one-click approval covers: the v4 user token is
+converted into a v3 session. The mirror is best effort — if it fails, the list write still stands
+and the error shows up in the sync status.
