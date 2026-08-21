@@ -21,12 +21,21 @@ import { Series } from '../types';
 import { getStoredTmdbToken, storeTmdbToken } from '../tmdbToken';
 import {
   clearTmdbWriteToken,
+  getTmdbAccountWatchlistEnabled,
   getTmdbListId,
   getTmdbMovieListId,
   getTmdbWriteToken,
+  saveTmdbAccountWatchlistEnabled,
   saveTmdbListSettings,
   saveTmdbWriteToken,
 } from '../tmdbSettings';
+
+/** The account-watchlist mirror is best effort, so its outcome is appended to the sync status. */
+function accountWatchlistNote(data: { accountWatchlist?: { message?: string }; accountWatchlistError?: string }): string {
+  if (data.accountWatchlistError) return ` Account watchlist: ${data.accountWatchlistError}`;
+  if (data.accountWatchlist?.message) return ` ${data.accountWatchlist.message}`;
+  return '';
+}
 
 interface TmdbSyncModalProps {
   isOpen: boolean;
@@ -51,6 +60,9 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
   const [tmdbApiKey, setTmdbApiKey] = useState<string>(() => {
     return localStorage.getItem('streampulse_tmdb_api_key') || getStoredTmdbToken();
   });
+  const [syncAccountWatchlist, setSyncAccountWatchlist] = useState<boolean>(() => {
+    return getTmdbAccountWatchlistEnabled();
+  });
   const [pendingRequestToken, setPendingRequestToken] = useState<string>('');
   const [isAuthorizing, setIsAuthorizing] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'sync' | 'nuvio' | 'shows'>('sync');
@@ -74,6 +86,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
 
   const handleSaveSettings = () => {
     saveTmdbListSettings(tmdbListId.trim(), tmdbMovieListId.trim());
+    saveTmdbAccountWatchlistEnabled(syncAccountWatchlist);
     localStorage.setItem('streampulse_tmdb_api_key', tmdbApiKey.trim());
     // Share the token with search/import so a key only has to be pasted once.
     storeTmdbToken(tmdbApiKey);
@@ -140,6 +153,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
           requestToken: pendingRequestToken,
           listId: cleanListId,
           movieListId: cleanMovieListId,
+          syncAccountWatchlist,
           watchlistSeries: watchlistedSeries.map((s) => ({
             id: s.id,
             title: s.title,
@@ -159,7 +173,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
         setSyncStatus({
           success: true,
           syncedCount: data.syncedCount || watchlistedSeries.length,
-          message: data.message || `Successfully synced ${showCount} shows and ${movieCount} movies to TMDB!`,
+          message: `${data.message || `Successfully synced ${showCount} shows and ${movieCount} movies to TMDB!`}${accountWatchlistNote(data)}`,
         });
       } else {
         setSyncStatus({
@@ -210,6 +224,8 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
           listId: cleanListId,
           movieListId: cleanMovieListId,
           apiKey: tokenToUse,
+          readToken: tmdbApiKey.trim(),
+          syncAccountWatchlist,
           watchlistSeries: watchlistedSeries.map((s) => ({
             id: s.id,
             title: s.title,
@@ -225,7 +241,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
         setSyncStatus({
           success: true,
           syncedCount: data.syncedCount || watchlistedSeries.length,
-          message: data.message || `Successfully synced ${showCount} shows and ${movieCount} movies to TMDB!`,
+          message: `${data.message || `Successfully synced ${showCount} shows and ${movieCount} movies to TMDB!`}${accountWatchlistNote(data)}`,
         });
       } else {
         // A rejected token usually means the approval expired: re-run the 1-click flow.
@@ -427,6 +443,27 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
                   Leave blank to keep sending movies to your shows / TV list.
                 </p>
               </div>
+
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={syncAccountWatchlist}
+                  onChange={(e) => {
+                    setSyncAccountWatchlist(e.target.checked);
+                    saveTmdbAccountWatchlistEnabled(e.target.checked);
+                  }}
+                  className="mt-0.5 w-4 h-4 accent-teal-500 cursor-pointer"
+                />
+                <span>
+                  <span className="block text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                    Also mirror to TMDB &ldquo;My Watchlist&rdquo;
+                  </span>
+                  <span className="block text-[11px] text-zinc-400 mt-0.5">
+                    Stremio&rsquo;s TMDB addon reads your account watchlist, not custom lists. Turn this on to keep
+                    both in sync.
+                  </span>
+                </span>
+              </label>
 
               <div>
                 <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
