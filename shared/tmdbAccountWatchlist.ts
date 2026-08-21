@@ -136,7 +136,7 @@ export async function mirrorTmdbAccountWatchlist(
   items: TmdbListSyncItem[],
   watchlist: boolean
 ): Promise<TmdbAccountWatchlistMirror> {
-  if (enabled !== true) return {};
+  if (enabled !== true || toTmdbListItems(items).length === 0) return {};
   try {
     const result = await updateTmdbAccountWatchlist(String(readToken ?? ''), String(writeToken ?? ''), items, watchlist);
     return { accountWatchlist: result };
