@@ -9,6 +9,7 @@ import { getAddonManifest, seriesToMetaItem, seriesToFullMeta, IMDB_MAPPING } fr
 import {
   TmdbError,
   TmdbMediaType,
+  discoverTmdb,
   fetchTmdbTitle,
   resolveTmdbCredentials,
   searchTmdb,
@@ -213,16 +214,28 @@ async function startServer() {
     res.json(item);
   });
 
-  // Live TV search via TVMaze API proxy (to support looking up ANY show on the planet)
+  // Live search across movies and shows: TMDB when a credential is available, TVMaze (shows only)
+  // as the fallback so the finder still works without a key.
   app.get("/api/series/live-search", async (req: Request, res: Response) => {
     const query = req.query.q as string;
     if (!query || query.trim().length === 0) {
-      res.json({ results: [] });
+      res.json({ results: [], source: "none" });
       return;
     }
 
+    const credentials = tmdbCredentialsFor(req);
+    if (credentials) {
+      const type = parseMediaType(req.query.type) ?? "multi";
+      try {
+        res.json({ results: await searchTmdb(credentials, query, type), source: "tmdb" });
+        return;
+      } catch (err) {
+        console.warn("TMDB search failed, falling back to TVMaze:", err);
+      }
+    }
+
     try {
-      res.json({ results: await searchTvmazeShows(query) });
+      res.json({ results: await searchTvmazeShows(query), source: "tvmaze" });
     } catch (err: any) {
       console.error("TVMaze proxy error:", err);
       res.status(500).json({ error: "Failed to fetch live show data" });
@@ -293,6 +306,27 @@ async function startServer() {
     try {
       const results = await trendingTmdb(credentials, type);
       res.json({ results });
+    } catch (err) {
+      sendTmdbError(res, err);
+    }
+  });
+
+  // Popularity-ordered TMDB pages backing the Series and Movies browse grids
+  app.get("/api/tmdb/discover", async (req: Request, res: Response) => {
+    const credentials = tmdbCredentialsFor(req);
+    if (!credentials) {
+      res.status(400).json({ error: "No TMDB API key configured. Add TMDB_API_KEY or paste a TMDB token.", needsToken: true });
+      return;
+    }
+
+    const mediaType = parseMediaType(req.query.type);
+    if (!mediaType) {
+      res.status(400).json({ error: "A media type of tv or movie is required." });
+      return;
+    }
+
+    try {
+      res.json(await discoverTmdb(credentials, mediaType, Number(req.query.page) || 1));
     } catch (err) {
       sendTmdbError(res, err);
     }

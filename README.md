@@ -3,6 +3,13 @@
 Streaming series and new-season tracker: browse a curated catalog across Netflix, Apple TV+, Max,
 Prime Video, Disney+ and more, track a watchlist, and import any movie or show from TMDB.
 
+The **Series** and **Movies** tabs each list the local catalog followed by popularity-ordered TMDB
+pages (`/discover/tv`, `/discover/movie`) with a "Load more" button, so anything can be favorited
+without importing it first — the bookmark button pulls the full TMDB record in the background.
+**Find Movies & Series** searches TMDB (`/search/multi`, movies *and* shows) whenever a TMDB
+credential is present and falls back to TVMaze (shows only) when it is not; the result list labels
+which source answered.
+
 ## Local development
 
 ```bash
@@ -43,7 +50,8 @@ directly yields a blank page because the app has to be compiled).
 
 In the static build:
 
-- The catalog, provider filters, watchlist, and global TVMaze search all work.
+- The catalog, provider filters, watchlist, and global search all work (TMDB with a
+  visitor-supplied key, TVMaze otherwise).
 - TMDB search and imports work with a visitor-supplied key (stored in their browser only);
   imported titles persist in `localStorage` instead of `data/tmdb-catalog.json`.
 - TMDB list sync works too: the v4 approval flow and list writes run against

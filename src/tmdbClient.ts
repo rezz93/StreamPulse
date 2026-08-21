@@ -42,6 +42,27 @@ export async function fetchTmdbTrending(type: 'all' | 'tv' | 'movie'): Promise<S
   return data.results || [];
 }
 
+export async function fetchTmdbDiscover(
+  type: 'tv' | 'movie',
+  page = 1
+): Promise<{ results: Series[]; page: number; totalPages: number }> {
+  const res = await apiFetch(`/api/tmdb/discover?type=${type}&page=${page}`, { headers: tmdbHeaders() });
+  const data = await readJson(res);
+  return { results: data.results || [], page: data.page || page, totalPages: data.totalPages || page };
+}
+
+/** Movies + shows when a TMDB credential is available, TVMaze shows only otherwise. */
+export async function liveSearchTitles(
+  query: string,
+  type: 'multi' | 'tv' | 'movie' = 'multi'
+): Promise<{ results: Series[]; source: string }> {
+  const res = await apiFetch(`/api/series/live-search?q=${encodeURIComponent(query)}&type=${type}`, {
+    headers: tmdbHeaders(),
+  });
+  const data = await readJson(res);
+  return { results: data.results || [], source: data.source || 'unknown' };
+}
+
 export async function importTmdbTitle(
   mediaType: 'tv' | 'movie',
   tmdbId: number

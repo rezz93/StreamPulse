@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { apiFetch } from './apiClient';
 import {
   Series,
@@ -29,6 +29,7 @@ import {
   migrateDefaultTmdbListId,
 } from './tmdbSettings';
 import { getStoredTmdbToken } from './tmdbToken';
+import { fetchTmdbDiscover, importTmdbTitle } from './tmdbClient';
 import {
   SlidersHorizontal,
   Flame,
@@ -39,7 +40,21 @@ import {
   Sparkles,
   Info,
   Calendar,
+  Loader2,
 } from 'lucide-react';
+
+type BrowseKind = 'tv' | 'movie';
+
+interface BrowseState {
+  results: Series[];
+  page: number;
+  totalPages: number;
+}
+
+const EMPTY_BROWSE: Record<BrowseKind, BrowseState> = {
+  tv: { results: [], page: 0, totalPages: 1 },
+  movie: { results: [], page: 0, totalPages: 1 },
+};
 
 export default function App() {
   const [seriesList, setSeriesList] = useState<Series[]>([]);
@@ -61,6 +76,11 @@ export default function App() {
   const [isTmdbModalOpen, setIsTmdbModalOpen] = useState<boolean>(false);
   const [isTmdbBrowseOpen, setIsTmdbBrowseOpen] = useState<boolean>(false);
   const [tmdbRemovalStatus, setTmdbRemovalStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Popularity-ordered TMDB pages that back the Series and Movies browse tabs
+  const [browse, setBrowse] = useState<Record<BrowseKind, BrowseState>>(EMPTY_BROWSE);
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const [browseError, setBrowseError] = useState<string | null>(null);
 
   // Watchlist persistence in localStorage & server sync for Bingecat Addon
   const [watchlist, setWatchlist] = useState<string[]>(() => {
@@ -112,6 +132,37 @@ export default function App() {
     }
     loadData();
   }, []);
+
+  const browseKind: BrowseKind | null =
+    activeCategory === 'movies' ? 'movie' : activeCategory === 'now_playing' ? 'tv' : null;
+
+  const loadBrowsePage = useCallback(async (kind: BrowseKind, page: number) => {
+    setBrowseLoading(true);
+    setBrowseError(null);
+    try {
+      const data = await fetchTmdbDiscover(kind, page);
+      setBrowse((prev) => {
+        const known = new Set(prev[kind].results.map((s) => s.id));
+        return {
+          ...prev,
+          [kind]: {
+            results: [...prev[kind].results, ...data.results.filter((s) => !known.has(s.id))],
+            page: data.page,
+            totalPages: data.totalPages,
+          },
+        };
+      });
+    } catch (err) {
+      setBrowseError(err instanceof Error ? err.message : 'Could not load titles from TMDB.');
+    } finally {
+      setBrowseLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!browseKind || browse[browseKind].page > 0 || browseLoading) return;
+    void loadBrowsePage(browseKind, 1);
+  }, [browseKind, browse, browseLoading, loadBrowsePage]);
 
   const showTmdbRemovalStatus = (type: 'success' | 'error', message: string) => {
     setTmdbRemovalStatus({ type, message });
@@ -195,7 +246,7 @@ export default function App() {
     );
   };
 
-  const handleTmdbImported = (series: Series, addToWatchlist: boolean) => {
+  const upsertSeries = (series: Series) => {
     setSeriesList((prev) => {
       const existing = prev.findIndex((s) => s.id === series.id);
       if (existing < 0) return [series, ...prev];
@@ -203,6 +254,30 @@ export default function App() {
       next[existing] = series;
       return next;
     });
+  };
+
+  /**
+   * Favoriting a browse/search row: the title is not in the catalog yet, so add the list-level
+   * record immediately and backfill the full TMDB metadata (providers, cast, seasons) after.
+   */
+  const handleFavoriteTitle = (series: Series) => {
+    if (watchlist.includes(series.id)) {
+      handleToggleWatchlist(series.id);
+      return;
+    }
+    if (!seriesList.some((s) => s.id === series.id)) {
+      upsertSeries(series);
+      if (series.tmdbId) {
+        void importTmdbTitle(series.mediaType === 'movie' ? 'movie' : 'tv', series.tmdbId)
+          .then(({ series: full }) => upsertSeries(full))
+          .catch((err) => console.warn('Could not load full TMDB metadata:', err));
+      }
+    }
+    setWatchlist((prev) => (prev.includes(series.id) ? prev : [...prev, series.id]));
+  };
+
+  const handleTmdbImported = (series: Series, addToWatchlist: boolean) => {
+    upsertSeries(series);
     if (addToWatchlist) {
       setWatchlist((prev) => (prev.includes(series.id) ? prev : [...prev, series.id]));
     }
@@ -275,10 +350,25 @@ export default function App() {
     };
   }, [seriesList]);
 
+  /**
+   * TMDB browse rows for the active tab, minus anything already in the catalog. They carry no
+   * provider data, so they are hidden while a network filter is on rather than filtered out.
+   */
+  const browseSuggestions = useMemo(() => {
+    if (!browseKind || selectedProvider !== 'all') return [];
+    const knownIds = new Set(seriesList.map((s) => s.id));
+    const knownTmdb = new Set(
+      seriesList.filter((s) => s.tmdbId).map((s) => `${s.mediaType ?? 'tv'}-${s.tmdbId}`)
+    );
+    return browse[browseKind].results.filter(
+      (s) => !knownIds.has(s.id) && !knownTmdb.has(`${s.mediaType ?? 'tv'}-${s.tmdbId}`)
+    );
+  }, [browse, browseKind, selectedProvider, seriesList]);
+
   // Filtered series list based on active options
   const filteredSeries = useMemo(() => {
     // Movies live in their own tab, while classics can include older films.
-    let list = seriesList.filter((s) =>
+    let list = [...seriesList, ...browseSuggestions].filter((s) =>
       activeCategory === 'movies' || activeCategory === 'watchlist' || activeCategory === 'classics'
         ? true
         : s.mediaType !== 'movie'
@@ -344,7 +434,26 @@ export default function App() {
     }
 
     return list;
-  }, [seriesList, activeCategory, selectedProvider, selectedGenre, searchQuery, sortBy, watchlist]);
+  }, [
+    seriesList,
+    browseSuggestions,
+    activeCategory,
+    selectedProvider,
+    selectedGenre,
+    searchQuery,
+    sortBy,
+    watchlist,
+  ]);
+
+  /** Browse and search rows are not in the catalog yet, so favoriting them has to import first. */
+  const handleToggleWatchlistInGrid = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const suggestion = seriesList.some((s) => s.id === id)
+      ? undefined
+      : filteredSeries.find((s) => s.id === id);
+    if (suggestion) handleFavoriteTitle(suggestion);
+    else handleToggleWatchlist(id);
+  };
 
   const isMoviesView = activeCategory === 'movies';
 
@@ -501,13 +610,13 @@ export default function App() {
                     <Flame className="w-5 h-5 text-rose-400" />
                   )}
                   <span>
-                    {isMoviesView ? 'Movies' : 'Now Streaming Series'} ({filteredSeries.length})
+                    {isMoviesView ? 'Movies' : 'Series'} ({filteredSeries.length})
                   </span>
                 </h2>
                 <p className="text-xs text-zinc-400 mt-0.5">
                   {isMoviesView
-                    ? 'Films you imported from TMDB — use "Add from TMDB" to add more'
-                    : 'Currently active, returning, and acclaimed series across major platforms'}
+                    ? 'Popular films from TMDB plus everything in your catalog — bookmark any card to favorite it'
+                    : 'Popular series from TMDB plus your tracked shows — bookmark any card to favorite it'}
                 </p>
               </div>
             </div>
@@ -524,7 +633,7 @@ export default function App() {
                     key={series.id}
                     series={series}
                     isWatchlisted={watchlist.includes(series.id)}
-                    onToggleWatchlist={handleToggleWatchlist}
+                    onToggleWatchlist={handleToggleWatchlistInGrid}
                     onSelect={handleOpenDetail}
                   />
                 ))}
@@ -533,11 +642,11 @@ export default function App() {
               <div className="p-12 text-center bg-zinc-900/40 rounded-3xl border border-zinc-800 space-y-3">
                 <Search className="w-8 h-8 text-zinc-500 mx-auto" />
                 <h3 className="text-base font-bold text-white">
-                  {isMoviesView ? 'No Movies Yet' : 'No Series Found'}
+                  {isMoviesView ? 'No Movies Found' : 'No Series Found'}
                 </h3>
                 <p className="text-xs text-zinc-400 max-w-sm mx-auto">
                   {isMoviesView
-                    ? 'Import films with "Add from TMDB" — they show up here.'
+                    ? 'Nothing matched. Popular films load from TMDB — add a TMDB key via "Add from TMDB" if this stays empty.'
                     : 'No series match your current filter combination. Try clearing filters or searching for another title.'}
                 </p>
                 <button
@@ -549,6 +658,29 @@ export default function App() {
                   className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all cursor-pointer"
                 >
                   Clear All Filters
+                </button>
+              </div>
+            )}
+
+            {browseError && (
+              <p className="text-xs text-amber-300 bg-amber-950/30 border border-amber-500/30 rounded-xl px-3 py-2">
+                {browseError} Add a TMDB key via "Add from TMDB" to browse the full catalog.
+              </p>
+            )}
+
+            {browseKind && !browseError && browse[browseKind].page < browse[browseKind].totalPages && (
+              <div className="flex justify-center">
+                <button
+                  onClick={() => void loadBrowsePage(browseKind, browse[browseKind].page + 1)}
+                  disabled={browseLoading}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 disabled:opacity-60 text-zinc-200 border border-zinc-700/70 text-xs font-semibold transition-all cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {browseLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>
+                    {browseLoading
+                      ? 'Loading more from TMDB...'
+                      : `Load more ${isMoviesView ? 'movies' : 'series'}`}
+                  </span>
                 </button>
               </div>
             )}
@@ -586,6 +718,8 @@ export default function App() {
           setSelectedSeries(series);
           setIsDetailModalOpen(true);
         }}
+        onToggleWatchlist={handleFavoriteTitle}
+        watchlistIds={watchlist}
       />
 
       {/* Android PWA & QR Code Modal */}
