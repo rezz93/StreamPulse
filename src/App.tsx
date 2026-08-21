@@ -428,10 +428,10 @@ export default function App() {
    */
   const searchHitIds = useMemo(() => {
     if (!isTabSearching) return new Set<string>();
-    const catalogIdByTmdb = new Map(
+    const catalogIdByTmdb = new Map<string, string>(
       seriesList
         .filter((s) => s.tmdbId)
-        .map((s) => [`${s.mediaType ?? 'tv'}-${s.tmdbId}`, s.id] as const)
+        .map((s) => [`${s.mediaType ?? 'tv'}-${s.tmdbId}`, s.id])
     );
     const ids = new Set<string>();
     for (const hit of tabSearch.results) {
