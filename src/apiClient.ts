@@ -1,4 +1,12 @@
-import { fetchTmdbTitle, resolveTmdbCredentials, searchTmdb, trendingTmdb, TmdbError, TmdbMediaType } from '../shared/tmdbService';
+import {
+  discoverTmdb,
+  fetchTmdbTitle,
+  resolveTmdbCredentials,
+  searchTmdb,
+  trendingTmdb,
+  TmdbError,
+  TmdbMediaType,
+} from '../shared/tmdbService';
 import {
   cleanTmdbListId,
   completeTmdbWriteAuth,
@@ -92,8 +100,17 @@ async function handleStatically(url: URL, init?: RequestInit): Promise<Response>
 
   if (pathname === '/api/series/live-search') {
     const query = searchParams.get('q') ?? '';
-    if (!query.trim()) return json({ results: [] });
-    return json({ results: await searchTvmazeShows(query) });
+    if (!query.trim()) return json({ results: [], source: 'none' });
+    const credentials = resolveTmdbCredentials(getStoredTmdbToken());
+    if (credentials) {
+      try {
+        const results = await searchTmdb(credentials, query, mediaType as TmdbMediaType | 'multi');
+        return json({ results, source: 'tmdb' });
+      } catch (err) {
+        console.warn('TMDB search failed, falling back to TVMaze:', err);
+      }
+    }
+    return json({ results: await searchTvmazeShows(query), source: 'tvmaze' });
   }
 
   if (pathname === '/api/tmdb/status') {
@@ -103,6 +120,15 @@ async function handleStatically(url: URL, init?: RequestInit): Promise<Response>
     const query = searchParams.get('q') ?? '';
     const results = await searchTmdb(staticCredentials(), query, mediaType as TmdbMediaType | 'multi');
     return json({ results });
+  }
+  if (pathname === '/api/tmdb/discover') {
+    return json(
+      await discoverTmdb(
+        staticCredentials(),
+        mediaType as TmdbMediaType,
+        Number(searchParams.get('page')) || 1
+      )
+    );
   }
   if (pathname === '/api/tmdb/trending') {
     const results = await trendingTmdb(staticCredentials(), mediaType as TmdbMediaType | 'all');

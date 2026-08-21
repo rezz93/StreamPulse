@@ -29,14 +29,14 @@ export const CategoryTabs: React.FC<CategoryTabsProps> = ({
   }> = [
     {
       id: 'now_playing',
-      label: 'Now Streaming',
-      description: 'Active & trending seasons',
+      label: 'Series',
+      description: 'Browse & favorite TV series',
       icon: Play,
     },
     {
       id: 'movies',
       label: 'Movies',
-      description: 'Films imported from TMDB',
+      description: 'Browse & favorite films',
       icon: Film,
       badge: moviesCount > 0 ? moviesCount : undefined,
     },

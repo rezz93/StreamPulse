@@ -9,6 +9,8 @@ import { TmdbError } from './tmdbService';
  */
 const TMDB_V4 = 'https://api.themoviedb.org/4';
 
+const NO_LISTS_MESSAGE = 'No custom TMDB list configured, so only your TMDB account watchlist was updated.';
+
 export interface TmdbWriteAuthStart {
   requestToken: string;
   authUrl: string;
@@ -179,17 +181,23 @@ export async function syncItemsToTmdbList(
   };
 }
 
-/** Adds known movies and shows to separate lists, retaining the legacy single-list behavior. */
+/**
+ * Splits the watchlist across the configured lists. Both list ids are optional: with neither
+ * set, the account watchlist mirror is the only destination and no list write is attempted.
+ */
 export async function syncItemsToTmdbLists(
   tvListId: unknown,
   movieListId: unknown,
   writeToken: string,
   items: TmdbListSyncItem[]
 ): Promise<TmdbListSyncResult> {
+  const tvList = cleanTmdbListId(tvListId);
   const movieList = cleanTmdbListId(movieListId);
-  const tvItems = movieList
-    ? items.filter((item) => item.mediaType !== 'movie')
-    : items;
+  if (!tvList && !movieList) {
+    return { syncedCount: 0, requestedCount: 0, message: NO_LISTS_MESSAGE, lists: [] };
+  }
+
+  const tvItems = movieList ? items.filter((item) => item.mediaType !== 'movie') : items;
   const movieItems = movieList ? items.filter((item) => item.mediaType === 'movie') : [];
   const tvPayload = toTmdbListItems(tvItems);
   const moviePayload = toTmdbListItems(movieItems);
@@ -200,16 +208,16 @@ export async function syncItemsToTmdbLists(
 
   const token = assertBearerToken(writeToken);
   const details: TmdbListSyncDetail[] = [];
-  if (tvPayload.length > 0) {
-    const result = await syncItemsToTmdbList(tvListId, token, tvItems);
+  if (tvList && tvPayload.length > 0) {
+    const result = await syncItemsToTmdbList(tvList, token, tvItems);
     details.push({
-      listId: cleanTmdbListId(tvListId),
+      listId: tvList,
       mediaKind: 'tv',
       syncedCount: result.syncedCount,
       requestedCount: result.requestedCount,
     });
   }
-  if (moviePayload.length > 0) {
+  if (movieList && moviePayload.length > 0) {
     const result = await syncItemsToTmdbList(movieList, token, movieItems);
     details.push({
       listId: movieList,
@@ -261,31 +269,34 @@ async function removeItemsFromTmdbList(
   return { removedCount, requestedCount: payload.length };
 }
 
-/** Removes known movies and shows from their configured lists. */
+/** Removes known movies and shows from their configured lists, if any are configured. */
 export async function removeItemsFromTmdbLists(
   tvListId: unknown,
   movieListId: unknown,
   writeToken: string,
   items: TmdbListSyncItem[]
 ): Promise<TmdbListRemovalResult> {
+  const tvList = cleanTmdbListId(tvListId);
   const movieList = cleanTmdbListId(movieListId);
-  const tvItems = movieList
-    ? items.filter((item) => item.mediaType !== 'movie')
-    : items;
+  if (!tvList && !movieList) {
+    return { removedCount: 0, requestedCount: 0, message: NO_LISTS_MESSAGE, lists: [] };
+  }
+
+  const tvItems = movieList ? items.filter((item) => item.mediaType !== 'movie') : items;
   const movieItems = movieList ? items.filter((item) => item.mediaType === 'movie') : [];
   const tvPayload = toTmdbListItems(tvItems);
   const moviePayload = toTmdbListItems(movieItems);
   const details: TmdbListRemovalDetail[] = [];
 
-  if (tvPayload.length > 0) {
-    const result = await removeItemsFromTmdbList(tvListId, writeToken, tvItems);
+  if (tvList && tvPayload.length > 0) {
+    const result = await removeItemsFromTmdbList(tvList, writeToken, tvItems);
     details.push({
-      listId: cleanTmdbListId(tvListId),
+      listId: tvList,
       mediaKind: 'tv',
       ...result,
     });
   }
-  if (moviePayload.length > 0) {
+  if (movieList && moviePayload.length > 0) {
     const result = await removeItemsFromTmdbList(movieList, writeToken, movieItems);
     details.push({
       listId: movieList,

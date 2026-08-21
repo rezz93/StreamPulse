@@ -67,6 +67,42 @@ const PROVIDER_MATCHERS: Array<{ id: StreamingProviderId; test: (name: string) =
   { id: 'peacock', test: (n) => n.includes('peacock') || n.includes('nbc') },
 ];
 
+/** TMDB genre ids are stable; list rows only carry ids, so map them for the app's genre filter. */
+const GENRE_NAMES: Record<number, string> = {
+  12: 'Adventure',
+  14: 'Fantasy',
+  16: 'Animation',
+  18: 'Drama',
+  27: 'Horror',
+  28: 'Action',
+  35: 'Comedy',
+  36: 'History',
+  37: 'Western',
+  53: 'Thriller',
+  80: 'Crime',
+  99: 'Documentary',
+  878: 'Science Fiction',
+  9648: 'Mystery',
+  10402: 'Music',
+  10749: 'Romance',
+  10751: 'Family',
+  10752: 'War',
+  10759: 'Action & Adventure',
+  10762: 'Kids',
+  10763: 'News',
+  10764: 'Reality',
+  10765: 'Sci-Fi & Fantasy',
+  10766: 'Soap',
+  10767: 'Talk',
+  10768: 'War & Politics',
+  10770: 'TV Movie',
+};
+
+function genreNames(ids: unknown): string[] {
+  if (!Array.isArray(ids)) return [];
+  return ids.map((id) => GENRE_NAMES[Number(id)]).filter((name): name is string => Boolean(name));
+}
+
 function matchProvider(name: string): StreamingProviderId | null {
   const lower = name.toLowerCase();
   return PROVIDER_MATCHERS.find((matcher) => matcher.test(lower))?.id ?? null;
@@ -120,7 +156,7 @@ function mapListResult(raw: any, mediaType: TmdbMediaType): Series {
     backdropUrl: imageUrl(raw.backdrop_path, 'w1280', FALLBACK_BACKDROP),
     providers: [],
     primaryProvider: 'all',
-    genres: [],
+    genres: genreNames(raw.genre_ids),
     rating: Number(raw.vote_average) || 0,
     ratingCount: raw.vote_count ? `${raw.vote_count} TMDB votes` : 'TMDB',
     contentRating: mediaType === 'tv' ? 'TV' : 'MOVIE',
@@ -272,6 +308,33 @@ export async function searchTmdb(
   return (data.results ?? [])
     .filter((raw) => (mediaType === 'multi' ? raw.media_type === 'tv' || raw.media_type === 'movie' : true))
     .map((raw) => mapListResult(raw, (mediaType === 'multi' ? raw.media_type : mediaType) as TmdbMediaType));
+}
+
+/**
+ * Popularity-ordered catalog pages, so the Series and Movies tabs can offer a browsable list
+ * instead of only titles that were already imported.
+ */
+export async function discoverTmdb(
+  credentials: TmdbCredentials,
+  mediaType: TmdbMediaType,
+  page = 1
+): Promise<{ results: Series[]; page: number; totalPages: number }> {
+  const data = await tmdbFetch<{ results: any[]; page: number; total_pages: number }>(
+    `/discover/${mediaType}`,
+    credentials,
+    {
+      include_adult: 'false',
+      language: 'en-US',
+      sort_by: 'popularity.desc',
+      'vote_count.gte': mediaType === 'movie' ? '150' : '50',
+      page: String(Math.max(1, Math.min(500, page))),
+    }
+  );
+  return {
+    results: (data.results ?? []).map((raw) => mapListResult(raw, mediaType)),
+    page: data.page ?? page,
+    totalPages: data.total_pages ?? page,
+  };
 }
 
 export async function trendingTmdb(

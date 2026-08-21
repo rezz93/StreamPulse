@@ -3,6 +3,13 @@
 Streaming series and new-season tracker: browse a curated catalog across Netflix, Apple TV+, Max,
 Prime Video, Disney+ and more, track a watchlist, and import any movie or show from TMDB.
 
+The **Series** and **Movies** tabs each list the local catalog followed by popularity-ordered TMDB
+pages (`/discover/tv`, `/discover/movie`) with a "Load more" button, so anything can be favorited
+without importing it first — the bookmark button pulls the full TMDB record in the background.
+**Find Movies & Series** searches TMDB (`/search/multi`, movies *and* shows) whenever a TMDB
+credential is present and falls back to TVMaze (shows only) when it is not; the result list labels
+which source answered.
+
 ## Local development
 
 ```bash
@@ -43,7 +50,8 @@ directly yields a blank page because the app has to be compiled).
 
 In the static build:
 
-- The catalog, provider filters, watchlist, and global TVMaze search all work.
+- The catalog, provider filters, watchlist, and global search all work (TMDB with a
+  visitor-supplied key, TVMaze otherwise).
 - TMDB search and imports work with a visitor-supplied key (stored in their browser only);
   imported titles persist in `localStorage` instead of `data/tmdb-catalog.json`.
 - TMDB list sync works too: the v4 approval flow and list writes run against
@@ -51,19 +59,29 @@ In the static build:
 - AI season intelligence and the Bingecat/Stremio addon are unavailable and report as much,
   since they need the server.
 
-### Syncing your watchlist to a TMDB list
+### Syncing your watchlist to TMDB
 
-Writing to a TMDB list needs your account's permission, not just an API key:
+Sync targets TMDB's built-in account watchlist (`themoviedb.org/u/<user>/watchlist`) by default;
+the list ID fields are optional extras. Writing to TMDB needs your account's permission, not just
+an API key:
 
 1. Paste your **API Read Access Token** (themoviedb.org/settings/api) into the TMDB modal.
 2. Click **1-Click TMDB Authorize** and approve the request on themoviedb.org.
 3. Come back and click **Complete Sync** — the write token is kept in `localStorage` so later
    syncs are one click.
 
-The list StreamPulse writes to is a normal TMDB *list*, which is not the same thing as TMDB's
-built-in "My Watchlist". Nuvio can read a list directly by its numeric ID, but Stremio's TMDB
-addon exposes your account watchlist instead. Tick **Also mirror to TMDB "My Watchlist"** in the
-TMDB modal to have syncs and un-favorites also write to the account watchlist
-(`POST /3/account/{id}/watchlist`), which the same one-click approval covers: the v4 user token is
-converted into a v3 session. The mirror is best effort — if it fails, the list write still stands
-and the error shows up in the sync status.
+A TMDB *list* (`themoviedb.org/list/<id>`) is not the same thing as TMDB's built-in
+"My Watchlist". Nuvio can read a list directly by its numeric ID, but a Stremio TMDB catalog
+labelled "TMDB Watchlist" exposes your account watchlist instead, so **Also mirror to TMDB
+"My Watchlist"** is on by default and both list ID fields may be left blank: syncs and
+un-favorites then only write the account watchlist (`POST /3/account/{id}/watchlist`), which the
+same one-click approval covers — the v4 user token is converted into a v3 session. Fill in a list
+ID to keep a custom list updated alongside it; that write is separate, and a failing account
+watchlist mirror shows up in the sync status without undoing it.
+
+To surface the StreamPulse list itself in Stremio (instead of the account watchlist), addons such
+as [aiometadata](https://github.com/cedya77/aiometadata) can add a list as its own catalog:
+in its configure page, TMDB Integration → paste `https://www.themoviedb.org/list/<list id>` →
+Preview → Add. It fetches list contents through TMDB's v3 `/list/{id}` endpoint, so a list that
+endpoint cannot return will come back empty and the account-watchlist mirror stays the reliable
+path.
