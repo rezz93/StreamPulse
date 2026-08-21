@@ -104,7 +104,7 @@ export const Header: React.FC<HeaderProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="Filter this tab by title, cast, genre..."
+                placeholder="Search TMDB or filter by cast, genre..."
                 className="w-full bg-zinc-900/90 border border-zinc-800 text-zinc-200 placeholder-zinc-500 rounded-xl pl-9.5 pr-4 py-2 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all"
               />
               {searchQuery && (

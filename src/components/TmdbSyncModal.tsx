@@ -20,7 +20,6 @@ import {
 import { Series } from '../types';
 import { getStoredTmdbToken, storeTmdbToken } from '../tmdbToken';
 import {
-  EXAMPLE_TMDB_LIST_ID,
   clearTmdbWriteToken,
   getTmdbAccountWatchlistEnabled,
   getTmdbListId,
@@ -400,7 +399,7 @@ export const TmdbSyncModal: React.FC<TmdbSyncModalProps> = ({
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    placeholder={`Optional: e.g. ${EXAMPLE_TMDB_LIST_ID} or https://www.themoviedb.org/list/${EXAMPLE_TMDB_LIST_ID}`}
+                    placeholder="Optional: list id or https://www.themoviedb.org/list/.."
                     value={tmdbListId}
                     onChange={(e) => setTmdbListId(e.target.value)}
                     className="flex-1 bg-zinc-900 border border-zinc-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-zinc-500 focus:outline-hidden focus:border-teal-500 transition-all font-mono"
