@@ -36,6 +36,8 @@ Serves the built client plus every `/api/*` route, the Bingecat/Stremio addon, a
 
 ### Static build (GitHub Pages)
 
+Live site: https://rezz93.github.io/StreamPulse/
+
 GitHub Pages cannot run the Express server, so the static build bakes the catalog into JSON at
 build time and talks to TMDB and TVMaze directly from the browser:
 
