@@ -31,7 +31,7 @@ export const IMDB_MAPPING: Record<string, { imdbId: string }> = {
 export function getAddonManifest(baseUrl: string) {
   return {
     id: 'org.streampulse.addon',
-    version: '1.3.0',
+    version: '1.3.1',
     name: 'StreamPulse Radar',
     description: 'Curated season premieres, renewed series radar, in-theaters & top streaming movies for Nuvio & Stremio.',
     logo: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=256&auto=format&fit=crop&q=80',
@@ -42,32 +42,27 @@ export function getAddonManifest(baseUrl: string) {
       {
         type: 'series',
         id: 'streampulse_upcoming',
-        name: 'StreamPulse: Upcoming Premieres',
-        extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }]
+        name: 'StreamPulse: Upcoming Premieres'
       },
       {
         type: 'series',
         id: 'streampulse_renewals',
-        name: 'StreamPulse: Renewed Radar',
-        extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }]
+        name: 'StreamPulse: Renewed Radar'
       },
       {
         type: 'series',
         id: 'streampulse_trending',
-        name: 'StreamPulse: Top Rated Shows',
-        extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }]
+        name: 'StreamPulse: Top Rated Shows'
       },
       {
         type: 'movie',
         id: 'streampulse_movies',
-        name: 'StreamPulse: Featured Cinema & Hits',
-        extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }]
+        name: 'StreamPulse: Featured Cinema & Hits'
       },
       {
         type: 'series',
         id: 'streampulse_watchlist',
-        name: 'StreamPulse: My Watchlist',
-        extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }]
+        name: 'StreamPulse: My Watchlist'
       }
     ],
     idPrefixes: ['tt', 'streampulse:']
