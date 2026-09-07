@@ -21,15 +21,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      # The repo tracks bun.lock rather than package-lock.json, so `npm ci` is not usable.
+          node-version: 22
+          cache: 'npm'
       - run: npm install --no-audit --no-fund
       - run: npm run lint
       - name: Build static site
         run: npm run build:static
         env:
           # Pages serves the site from https://<user>.github.io/<repo>/
-          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_BASE_PATH: /${{ github.event.repository.name || 'StreamPulse' }}/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

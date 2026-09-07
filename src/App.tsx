@@ -17,6 +17,7 @@ import { UpcomingTimelineView } from './components/UpcomingTimelineView';
 import { WatchlistView } from './components/WatchlistView';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { AndroidPwaModal } from './components/AndroidPwaModal';
+import { NuvioStremioModal } from './components/NuvioStremioModal';
 import {
   Flame,
   ArrowUpDown,
@@ -56,6 +57,7 @@ export default function App() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState<boolean>(false);
   const [isAndroidModalOpen, setIsAndroidModalOpen] = useState<boolean>(false);
+  const [isNuvioModalOpen, setIsNuvioModalOpen] = useState<boolean>(false);
 
   // Watchlist persistence in localStorage & server sync for Bingecat Addon
   const [watchlist, setWatchlist] = useState<string[]>(() => {
@@ -379,6 +381,7 @@ export default function App() {
         onSearchChange={setSearchQuery}
         onOpenLiveSearch={() => setIsGlobalSearchOpen(true)}
         onOpenAndroidModal={() => setIsAndroidModalOpen(true)}
+        onOpenNuvioModal={() => setIsNuvioModalOpen(true)}
         activeCategory={activeCategory}
         onSelectCategory={setActiveCategory}
         watchlistCount={watchlist.length}
@@ -648,6 +651,7 @@ export default function App() {
             onSelectSeries={handleOpenDetail}
             onBrowseMore={() => setActiveCategory('now_playing')}
             onClearFilters={clearFilters}
+            onOpenNuvioModal={() => setIsNuvioModalOpen(true)}
           />
         ) : (
           /* DEFAULT: NOW PLAYING / MOVIES / SERIES STANDARD BROWSER */
@@ -843,6 +847,13 @@ export default function App() {
       <AndroidPwaModal
         isOpen={isAndroidModalOpen}
         onClose={() => setIsAndroidModalOpen(false)}
+      />
+
+      {/* Nuvio & Stremio Addon Sync Modal */}
+      <NuvioStremioModal
+        isOpen={isNuvioModalOpen}
+        onClose={() => setIsNuvioModalOpen(false)}
+        watchlistSeries={seriesList.filter((s) => watchlist.includes(s.id))}
       />
     </div>
   );

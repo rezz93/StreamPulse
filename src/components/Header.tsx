@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clapperboard, Search, Bookmark, Sparkles, Flame, Calendar, Film, Tv } from 'lucide-react';
+import { Clapperboard, Search, Bookmark, Sparkles, Flame, Calendar, Film, Tv, Puzzle } from 'lucide-react';
 import { SeriesCategory } from '../types';
 
 interface HeaderProps {
@@ -7,6 +7,7 @@ interface HeaderProps {
   onSearchChange: (q: string) => void;
   onOpenLiveSearch: () => void;
   onOpenAndroidModal: () => void;
+  onOpenNuvioModal: () => void;
   activeCategory: SeriesCategory;
   onSelectCategory: (category: SeriesCategory) => void;
   watchlistCount: number;
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSearchChange,
   onOpenLiveSearch,
   onOpenAndroidModal,
+  onOpenNuvioModal,
   activeCategory,
   onSelectCategory,
   watchlistCount,
@@ -142,6 +144,17 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Tv className="w-3.5 h-3.5 text-emerald-400" />
               <span className="hidden sm:inline">Android PWA</span>
+            </button>
+
+            {/* Nuvio & Stremio Addon button */}
+            <button
+              id="btn-nuvio-addon"
+              onClick={onOpenNuvioModal}
+              title="Install StreamPulse Addon into Nuvio or Stremio"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-950/50 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-500/40 text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shadow-xs"
+            >
+              <Puzzle className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="hidden sm:inline">Nuvio Addon</span>
             </button>
           </div>
         </div>

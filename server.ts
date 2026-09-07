@@ -323,6 +323,8 @@ async function startServer() {
 
   // 1. Addon Manifest
   const handleManifest = (req: Request, res: Response) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', '*');
     const host = req.get('host') || 'localhost:3000';
     const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
     const baseUrl = `${protocol}://${host}`;
@@ -336,7 +338,9 @@ async function startServer() {
 
   // 2. Addon Catalog Endpoint
   const handleCatalog = (req: Request, res: Response) => {
-    const { catalogId } = req.params;
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    const { catalogId, type } = req.params;
     const queryWatchlist = req.query.watchlist as string;
     
     let activeWatchlist = currentServerWatchlist;
@@ -349,49 +353,54 @@ async function startServer() {
     if (catalogId === 'streampulse_watchlist') {
       items = seriesDatabase.filter(s => activeWatchlist.includes(s.id));
       if (items.length === 0) {
-        // Fallback to top featured if empty
         items = seriesDatabase.slice(0, 6);
       }
     } else if (catalogId === 'streampulse_upcoming') {
-      items = seriesDatabase.filter(s => s.isUpcoming || (s.nextSeasonDaysLeft !== undefined && s.nextSeasonDaysLeft > 0 && s.nextSeasonDaysLeft <= 180));
+      items = seriesDatabase.filter(s => s.mediaType !== 'movie' && (s.isUpcoming || (s.nextSeasonDaysLeft !== undefined && s.nextSeasonDaysLeft > 0 && s.nextSeasonDaysLeft <= 180)));
     } else if (catalogId === 'streampulse_renewals') {
-      items = seriesDatabase.filter(s => s.hasNewSeasonAlert || ['season_upcoming', 'renewed', 'in_production', 'final_season_upcoming'].includes(s.renewalState));
+      items = seriesDatabase.filter(s => s.mediaType !== 'movie' && (s.hasNewSeasonAlert || ['season_upcoming', 'renewed', 'in_production', 'final_season_upcoming'].includes(s.renewalState)));
+    } else if (catalogId === 'streampulse_movies') {
+      items = seriesDatabase.filter(s => s.mediaType === 'movie');
     } else {
       // streampulse_trending
-      items = [...seriesDatabase].sort((a, b) => b.rating - a.rating).slice(0, 15);
+      items = seriesDatabase.filter(s => s.mediaType !== 'movie').sort((a, b) => b.rating - a.rating).slice(0, 20);
     }
 
     const metas = items.map(seriesToMetaItem);
     res.json({ metas });
   };
 
-  app.get("/bingecat/catalog/series/:catalogId.json", handleCatalog);
-  app.get("/bingecat/catalog/series/:catalogId/:extra.json", handleCatalog);
-  app.get("/stremio/catalog/series/:catalogId.json", handleCatalog);
-  app.get("/stremio/catalog/series/:catalogId/:extra.json", handleCatalog);
-  app.get("/catalog/series/:catalogId.json", handleCatalog);
-  app.get("/catalog/series/:catalogId/:extra.json", handleCatalog);
+  app.get(["/catalog/:type/:catalogId.json", "/catalog/:type/:catalogId/:extra.json"], handleCatalog);
+  app.get(["/stremio/catalog/:type/:catalogId.json", "/stremio/catalog/:type/:catalogId/:extra.json"], handleCatalog);
+  app.get(["/bingecat/catalog/:type/:catalogId.json", "/bingecat/catalog/:type/:catalogId/:extra.json"], handleCatalog);
 
   // 3. Addon Meta Endpoint
   const handleMeta = (req: Request, res: Response) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', '*');
     const { id } = req.params;
-    // Look up by IMDb ID or streampulse ID
-    let found = seriesDatabase.find(s => {
+    // Look up by IMDb ID, custom ID, or slug
+    const found = seriesDatabase.find(s => {
       const mapping = IMDB_MAPPING[s.id];
-      return mapping?.imdbId === id || `streampulse:${s.id}` === id || s.id === id;
+      return (
+        s.imdbId === id ||
+        mapping?.imdbId === id ||
+        `streampulse:${s.id}` === id ||
+        s.id === id
+      );
     });
 
     if (!found) {
-      res.status(404).json({ error: "Series metadata not found" });
+      res.status(404).json({ error: "Metadata not found" });
       return;
     }
 
     res.json({ meta: seriesToFullMeta(found) });
   };
 
-  app.get("/bingecat/meta/series/:id.json", handleMeta);
-  app.get("/stremio/meta/series/:id.json", handleMeta);
-  app.get("/meta/series/:id.json", handleMeta);
+  app.get("/meta/:type/:id.json", handleMeta);
+  app.get("/stremio/meta/:type/:id.json", handleMeta);
+  app.get("/bingecat/meta/:type/:id.json", handleMeta);
 
   // --- Vite Middleware ---
   if (process.env.NODE_ENV !== "production") {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Series } from '../types';
 import { SeriesCard } from './SeriesCard';
-import { Bookmark, Bell, ArrowRight, SlidersHorizontal } from 'lucide-react';
+import { Bookmark, Bell, ArrowRight, SlidersHorizontal, Puzzle, Download } from 'lucide-react';
 
 interface WatchlistViewProps {
   watchlistedSeries: Series[];
@@ -12,6 +12,7 @@ interface WatchlistViewProps {
   onSelectSeries: (series: Series) => void;
   onBrowseMore: () => void;
   onClearFilters: () => void;
+  onOpenNuvioModal?: () => void;
 }
 
 export const WatchlistView: React.FC<WatchlistViewProps> = ({
@@ -23,6 +24,7 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
   onSelectSeries,
   onBrowseMore,
   onClearFilters,
+  onOpenNuvioModal,
 }) => {
   const showsWithNewSeasons = watchlistedSeries.filter(
     (s) => s.hasNewSeasonAlert || ['season_upcoming', 'renewed', 'in_production', 'final_season_upcoming'].includes(s.renewalState)
@@ -48,7 +50,7 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="bg-zinc-950/80 border border-amber-500/30 px-4 py-3 rounded-2xl text-center">
               <div className="text-2xl font-black text-amber-300">{totalWatchlistCount}</div>
               <div className="text-[11px] font-semibold text-zinc-400 mt-0.5">Saved Series</div>
@@ -58,6 +60,16 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
                 <div className="text-2xl font-black text-indigo-400">{showsWithNewSeasons.length}</div>
                 <div className="text-[11px] font-semibold text-zinc-400 mt-0.5">Returning Soon</div>
               </div>
+            )}
+            {onOpenNuvioModal && (
+              <button
+                id="btn-watchlist-nuvio-sync"
+                onClick={onOpenNuvioModal}
+                className="px-4 py-3 rounded-2xl bg-indigo-950/70 hover:bg-indigo-900/90 border border-indigo-500/50 text-indigo-200 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-lg group"
+              >
+                <Puzzle className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" />
+                <span>Sync to Nuvio / Stremio</span>
+              </button>
             )}
           </div>
         </div>

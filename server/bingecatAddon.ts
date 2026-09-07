@@ -30,38 +30,44 @@ export const IMDB_MAPPING: Record<string, { imdbId: string }> = {
 
 export function getAddonManifest(baseUrl: string) {
   return {
-    id: 'org.streampulse.bingecat',
-    version: '1.2.0',
-    name: 'StreamPulse Series Radar',
-    description: 'Direct watchlist sync and upcoming season premiere alerts for Bingecat & Stremio.',
+    id: 'org.streampulse.addon',
+    version: '1.3.0',
+    name: 'StreamPulse Radar',
+    description: 'Curated season premieres, renewed series radar, in-theaters & top streaming movies for Nuvio & Stremio.',
     logo: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=256&auto=format&fit=crop&q=80',
     background: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1280&auto=format&fit=crop&q=80',
     resources: ['catalog', 'meta'],
-    types: ['series'],
+    types: ['series', 'movie'],
     catalogs: [
       {
         type: 'series',
-        id: 'streampulse_watchlist',
-        name: 'StreamPulse: Watchlist',
-        extra: [{ name: 'search', isRequired: false }]
-      },
-      {
-        type: 'series',
         id: 'streampulse_upcoming',
-        name: 'StreamPulse: Upcoming Season Premieres',
-        extra: [{ name: 'search', isRequired: false }]
+        name: 'StreamPulse: Upcoming Premieres',
+        extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }]
       },
       {
         type: 'series',
         id: 'streampulse_renewals',
-        name: 'StreamPulse: Renewed Season Radar',
-        extra: [{ name: 'search', isRequired: false }]
+        name: 'StreamPulse: Renewed Radar',
+        extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }]
       },
       {
         type: 'series',
         id: 'streampulse_trending',
         name: 'StreamPulse: Top Rated Shows',
-        extra: [{ name: 'search', isRequired: false }]
+        extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }]
+      },
+      {
+        type: 'movie',
+        id: 'streampulse_movies',
+        name: 'StreamPulse: Featured Cinema & Hits',
+        extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }]
+      },
+      {
+        type: 'series',
+        id: 'streampulse_watchlist',
+        name: 'StreamPulse: My Watchlist',
+        extra: [{ name: 'search', isRequired: false }, { name: 'skip', isRequired: false }]
       }
     ],
     idPrefixes: ['tt', 'streampulse:']
@@ -70,11 +76,12 @@ export function getAddonManifest(baseUrl: string) {
 
 export function seriesToMetaItem(series: Series) {
   const mapping = IMDB_MAPPING[series.id];
-  const metaId = mapping?.imdbId || `streampulse:${series.id}`;
+  const metaId = series.imdbId || mapping?.imdbId || `streampulse:${series.id}`;
+  const isMovie = series.mediaType === 'movie';
 
   return {
     id: metaId,
-    type: 'series',
+    type: isMovie ? 'movie' : 'series',
     name: series.title,
     poster: series.posterUrl,
     posterShape: 'poster',
@@ -82,14 +89,16 @@ export function seriesToMetaItem(series: Series) {
     background: series.backdropUrl,
     logo: series.posterUrl,
     description: `${series.renewalBadgeText ? `[${series.renewalBadgeText}] ` : ''}${series.synopsis}`,
-    releaseInfo: `${series.firstAirYear} • ${series.totalSeasons} Season${series.totalSeasons > 1 ? 's' : ''}`,
-    imdbRating: series.rating.toFixed(1),
+    releaseInfo: isMovie
+      ? `${series.firstAirYear}${series.runtimeMinutes ? ` • ${series.runtimeMinutes} min` : ''}`
+      : `${series.firstAirYear} • ${series.totalSeasons} Season${series.totalSeasons > 1 ? 's' : ''}`,
+    imdbRating: series.rating ? series.rating.toFixed(1) : undefined,
     genres: series.genres,
     links: [
       {
         name: series.primaryProvider.toUpperCase(),
         category: 'Stream',
-        url: `https://bingecat.com/search?q=${encodeURIComponent(series.title)}`
+        url: `https://trakt.tv/search/imdb/${encodeURIComponent(metaId)}`
       }
     ]
   };
@@ -97,7 +106,16 @@ export function seriesToMetaItem(series: Series) {
 
 export function seriesToFullMeta(series: Series) {
   const base = seriesToMetaItem(series);
-  
+  const isMovie = series.mediaType === 'movie';
+
+  if (isMovie) {
+    return {
+      ...base,
+      runtime: series.runtimeMinutes ? `${series.runtimeMinutes} min` : undefined,
+      trailers: []
+    };
+  }
+
   const videos = (series.seasons || []).flatMap((season) => {
     return Array.from({ length: season.episodeCount }, (_, idx) => {
       const epNum = idx + 1;
