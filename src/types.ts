@@ -1,10 +1,12 @@
 export type StreamingProviderId =
   | 'all'
+  | 'theaters'
   | 'netflix'
   | 'appletv'
   | 'max'
   | 'prime'
   | 'disney'
+  | 'mubi'
   | 'hulu'
   | 'paramount'
   | 'peacock';
@@ -22,10 +24,14 @@ export interface StreamingProvider {
 export type SeriesCategory =
   | 'now_playing'
   | 'movies'
+  | 'series'
   | 'upcoming'
   | 'new_seasons'
   | 'classics'
   | 'watchlist';
+
+export type TimelineEra = 'all' | 'current' | 'past' | 'upcoming';
+export type MediaKind = 'all' | 'theaters' | 'movies' | 'series';
 
 export type RenewalState =
   | 'airing_now'
@@ -55,7 +61,6 @@ export interface CastMember {
 
 export interface Series {
   id: string;
-  tmdbId?: number;
   imdbId?: string;
   mediaType?: 'tv' | 'movie';
   title: string;
@@ -73,16 +78,25 @@ export interface Series {
   contentRating: string; // e.g. TV-MA, TV-14
   firstAirYear: number;
   lastAirYear?: number;
-  decade: '70s' | '80s' | '90s' | '2000s' | '2010s' | '2020s';
+  decade: 'Pre-70s' | '70s' | '80s' | '90s' | '2000s' | '2010s' | '2020s';
   totalSeasons: number;
   totalEpisodes: number;
-  status: 'Returning Series' | 'Ended' | 'Upcoming Series' | 'In Production';
+  runtimeMinutes?: number;
+  theaterStatus?: 'now_in_theaters' | 'coming_to_theaters' | 'past_theatrical';
+  boxOffice?: string;
+  director?: string;
+  status: 'Returning Series' | 'Ended' | 'Upcoming Series' | 'In Production' | 'Released' | 'In Theaters' | 'Upcoming';
   
   // Category flags
   isNowPlaying: boolean;
   isUpcoming: boolean;
   isClassic: boolean;
   hasNewSeasonAlert: boolean;
+
+  // Provider Curation & Editorial Shelves
+  isNewOnProvider?: boolean;
+  isNextWatch?: boolean;
+  isCurrentlyAiring?: boolean;
 
   // Specific New Season / Renewal info
   renewalState: RenewalState;
@@ -98,6 +112,7 @@ export interface Series {
   cast: CastMember[];
   creator?: string;
   network?: string;
+  source?: 'catalog' | 'wikipedia' | 'tvmaze' | 'gemini_radar';
 }
 
 export interface AISeasonIntel {

@@ -1,23 +1,26 @@
 import React from 'react';
 import { SeriesCategory } from '../types';
-import { Play, Calendar, Sparkles, Archive, Bookmark, Film } from 'lucide-react';
+import { Flame, Film, Tv, Calendar, Archive, Bookmark, Clapperboard } from 'lucide-react';
 
 interface CategoryTabsProps {
   activeCategory: SeriesCategory;
   onSelectCategory: (category: SeriesCategory) => void;
   watchlistCount: number;
-  newSeasonsCount: number;
+  newSeasonsCount?: number;
+  theatersCount?: number;
   upcomingCount: number;
   moviesCount: number;
+  seriesCount?: number;
 }
 
 export const CategoryTabs: React.FC<CategoryTabsProps> = ({
   activeCategory,
   onSelectCategory,
   watchlistCount,
-  newSeasonsCount,
+  theatersCount = 0,
   upcomingCount,
   moviesCount,
+  seriesCount = 0,
 }) => {
   const tabs: Array<{
     id: SeriesCategory;
@@ -29,42 +32,43 @@ export const CategoryTabs: React.FC<CategoryTabsProps> = ({
   }> = [
     {
       id: 'now_playing',
-      label: 'Series',
-      description: 'Browse & favorite TV series',
-      icon: Play,
+      label: 'In Theaters & Now Playing',
+      description: 'Currently in theaters and hot streaming releases',
+      icon: Clapperboard,
+      badge: theatersCount > 0 ? theatersCount : undefined,
+      badgeHighlight: true,
     },
     {
       id: 'movies',
-      label: 'Movies',
-      description: 'Browse & favorite films',
+      label: 'Streaming Movies',
+      description: 'Feature films across premium providers',
       icon: Film,
       badge: moviesCount > 0 ? moviesCount : undefined,
     },
     {
+      id: 'series',
+      label: 'Premium Series',
+      description: 'Top streaming series & season status',
+      icon: Tv,
+      badge: seriesCount > 0 ? seriesCount : undefined,
+    },
+    {
       id: 'upcoming',
-      label: 'Upcoming Premieres',
-      description: 'Release dates & countdowns',
+      label: 'Upcoming & Future',
+      description: 'Theatrical releases & upcoming seasons',
       icon: Calendar,
       badge: upcomingCount,
     },
     {
-      id: 'new_seasons',
-      label: 'New Season Radar',
-      description: 'Renewals & production intel',
-      icon: Sparkles,
-      badge: newSeasonsCount,
-      badgeHighlight: true,
-    },
-    {
       id: 'classics',
-      label: 'Classic & Older Series',
-      description: 'By decade (80s, 90s, 00s, 10s)',
+      label: 'Past & Classics',
+      description: 'Cinema milestones & vintage series by decade',
       icon: Archive,
     },
     {
       id: 'watchlist',
       label: 'My Watchlist',
-      description: 'Tracked shows & season alerts',
+      description: 'Saved movies & tracked series',
       icon: Bookmark,
       badge: watchlistCount > 0 ? watchlistCount : undefined,
     },
@@ -91,7 +95,7 @@ export const CategoryTabs: React.FC<CategoryTabsProps> = ({
               <Icon
                 className={`w-4 h-4 transition-colors ${
                   isActive
-                    ? tab.id === 'new_seasons'
+                    ? tab.id === 'now_playing'
                       ? 'text-amber-400'
                       : 'text-indigo-400'
                     : 'text-zinc-500 group-hover:text-zinc-300'

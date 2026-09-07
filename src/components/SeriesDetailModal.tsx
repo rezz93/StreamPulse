@@ -128,13 +128,28 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
           <div className="absolute bottom-4 sm:bottom-6 inset-x-4 sm:inset-x-6 flex flex-col sm:flex-row items-start sm:items-end gap-4 z-10">
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <ProviderBadge providerId={series.primaryProvider} size="md" />
+                {series.theaterStatus === 'now_in_theaters' ? (
+                  <span className="px-3 py-1 rounded-lg bg-amber-500 text-zinc-950 font-black text-xs tracking-wider shadow-md">
+                    IN THEATERS NOW
+                  </span>
+                ) : series.theaterStatus === 'coming_to_theaters' ? (
+                  <span className="px-3 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 font-black text-xs tracking-wider shadow-md">
+                    COMING TO THEATERS
+                  </span>
+                ) : (
+                  <ProviderBadge providerId={series.primaryProvider} size="md" />
+                )}
                 <StatusBadge
                   renewalState={series.renewalState}
                   text={series.renewalBadgeText}
                   daysLeft={series.nextSeasonDaysLeft}
                   size="md"
                 />
+                {series.boxOffice && (
+                  <span className="px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 font-bold text-xs border border-amber-500/30">
+                    Box Office: {series.boxOffice}
+                  </span>
+                )}
               </div>
 
               <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white drop-shadow-md">
@@ -162,7 +177,22 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                 <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-xs font-semibold text-zinc-300">
                   {series.contentRating}
                 </span>
-                {!isMovie && (
+                {isMovie ? (
+                  <>
+                    {series.runtimeMinutes && (
+                      <>
+                        <span>•</span>
+                        <span>{Math.floor(series.runtimeMinutes / 60)}h {series.runtimeMinutes % 60}m</span>
+                      </>
+                    )}
+                    {series.director && (
+                      <>
+                        <span>•</span>
+                        <span>Dir: <strong className="text-white">{series.director}</strong></span>
+                      </>
+                    )}
+                  </>
+                ) : (
                   <>
                     <span>•</span>
                     <span>{series.totalSeasons} {series.totalSeasons === 1 ? 'Season' : 'Seasons'} ({series.totalEpisodes} eps)</span>

@@ -2,7 +2,7 @@ import React from 'react';
 import { Series } from '../types';
 import { ProviderBadge } from './ProviderBadge';
 import { StatusBadge } from './StatusBadge';
-import { Star, Bookmark, Calendar, Film, Bell, Check } from 'lucide-react';
+import { Star, Bookmark, Calendar, Film, Bell, Check, Clapperboard, Clock, Zap, Radio, Sparkles } from 'lucide-react';
 
 interface SeriesCardProps {
   series: Series;
@@ -17,6 +17,10 @@ export const SeriesCard: React.FC<SeriesCardProps> = ({
   onToggleWatchlist,
   onSelect,
 }) => {
+  const formattedRuntime = series.runtimeMinutes
+    ? `${Math.floor(series.runtimeMinutes / 60)}h ${series.runtimeMinutes % 60}m`
+    : null;
+
   return (
     <div
       id={`series-card-${series.id}`}
@@ -39,8 +43,21 @@ export const SeriesCard: React.FC<SeriesCardProps> = ({
         {/* Top Badges Bar */}
         <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between gap-1.5 z-10">
           <div className="flex flex-wrap items-center gap-1.5 max-w-[80%]">
-            <ProviderBadge providerId={series.primaryProvider} size="sm" />
-            {series.providers.length > 1 && (
+            {series.theaterStatus === 'now_in_theaters' ? (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-500 text-zinc-950 text-xs font-black tracking-wide shadow-md">
+                <Clapperboard className="w-3 h-3" />
+                IN THEATERS
+              </span>
+            ) : series.theaterStatus === 'coming_to_theaters' ? (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold shadow-md">
+                <Clapperboard className="w-3 h-3" />
+                COMING TO CINEMA
+              </span>
+            ) : (
+              <ProviderBadge providerId={series.primaryProvider} size="sm" />
+            )}
+
+            {series.providers.length > 1 && series.theaterStatus !== 'now_in_theaters' && (
               <span className="px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur-xs text-[10px] font-semibold text-zinc-300 border border-white/10">
                 +{series.providers.length - 1} more
               </span>
@@ -78,7 +95,7 @@ export const SeriesCard: React.FC<SeriesCardProps> = ({
           {series.hasNewSeasonAlert && (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold">
               <Bell className="w-2.5 h-2.5" />
-              New Season
+              {series.mediaType === 'movie' ? 'Upcoming' : 'New Season'}
             </span>
           )}
         </div>
@@ -107,14 +124,51 @@ export const SeriesCard: React.FC<SeriesCardProps> = ({
             </span>
             <span>•</span>
             <span className="flex items-center gap-1 font-medium text-zinc-300">
-              <Film className="w-3 h-3 text-zinc-500" />
-              {series.mediaType === 'movie'
-                ? 'Film'
-                : `${series.totalSeasons} ${series.totalSeasons === 1 ? 'Season' : 'Seasons'}`}
+              {series.mediaType === 'movie' ? (
+                <>
+                  <Film className="w-3 h-3 text-zinc-500" />
+                  {formattedRuntime || 'Movie'}
+                </>
+              ) : (
+                <>
+                  <Film className="w-3 h-3 text-zinc-500" />
+                  {`${series.totalSeasons} ${series.totalSeasons === 1 ? 'Season' : 'Seasons'}`}
+                </>
+              )}
             </span>
-            <span>•</span>
-            <span>{series.decade}</span>
+            {series.director && (
+              <>
+                <span>•</span>
+                <span className="text-zinc-400 truncate max-w-[120px]" title={`Dir: ${series.director}`}>
+                  Dir: {series.director}
+                </span>
+              </>
+            )}
           </div>
+
+          {/* Curation Shelf Tags */}
+          {(series.isNewOnProvider || series.isNextWatch || series.isCurrentlyAiring) && (
+            <div className="flex flex-wrap items-center gap-1 mt-2">
+              {series.isNewOnProvider && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                  <Zap className="w-2.5 h-2.5" />
+                  New Drop
+                </span>
+              )}
+              {series.isNextWatch && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-300 border border-purple-500/30 text-[10px] font-bold">
+                  <Sparkles className="w-2.5 h-2.5" />
+                  Next Watch
+                </span>
+              )}
+              {series.isCurrentlyAiring && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/15 text-rose-300 border border-rose-500/30 text-[10px] font-bold">
+                  <Radio className="w-2.5 h-2.5" />
+                  Airing Now
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Synopsis */}
           <p className="mt-2 text-xs text-zinc-400 line-clamp-2 leading-relaxed">
@@ -122,10 +176,15 @@ export const SeriesCard: React.FC<SeriesCardProps> = ({
           </p>
         </div>
 
-        {/* Footer: Genres & Season Details */}
+        {/* Footer: Genres & Release Details */}
         <div className="pt-2.5 border-t border-zinc-800/80 flex items-center justify-between gap-2">
           <div className="flex flex-wrap gap-1 items-center overflow-hidden">
-            {series.genres.slice(0, 2).map((g) => (
+            {series.boxOffice ? (
+              <span className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-bold">
+                {series.boxOffice}
+              </span>
+            ) : null}
+            {series.genres.slice(0, series.boxOffice ? 1 : 2).map((g) => (
               <span
                 key={g}
                 className="px-2 py-0.5 rounded-md bg-zinc-800/90 text-zinc-400 text-[10px] font-medium"
@@ -133,13 +192,27 @@ export const SeriesCard: React.FC<SeriesCardProps> = ({
                 {g}
               </span>
             ))}
+            {series.source === 'wikipedia' && (
+              <span className="px-1.5 py-0.5 rounded-md bg-blue-950/60 text-blue-300/90 border border-blue-800/40 text-[9px] font-medium">
+                Wikipedia
+              </span>
+            )}
+            {series.source === 'tvmaze' && (
+              <span className="px-1.5 py-0.5 rounded-md bg-purple-950/60 text-purple-300/90 border border-purple-800/40 text-[9px] font-medium">
+                TVMaze
+              </span>
+            )}
           </div>
 
-          {series.nextSeasonReleaseDate && (
+          {series.nextSeasonReleaseDate ? (
             <div className="flex items-center gap-1 text-[11px] text-zinc-400 shrink-0 font-medium">
               <Calendar className="w-3 h-3 text-indigo-400" />
-              <span>Next: {new Date(series.nextSeasonReleaseDate).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</span>
+              <span>{series.mediaType === 'movie' ? 'Release' : 'Next'}: {new Date(series.nextSeasonReleaseDate).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}</span>
             </div>
+          ) : (
+            <span className="text-[11px] text-zinc-500 font-medium">
+              {series.primaryProvider === 'theaters' ? 'In Cinemas' : series.network || 'Streaming'}
+            </span>
           )}
         </div>
       </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { apiFetch } from './apiClient';
 import {
   Series,
@@ -17,75 +17,45 @@ import { UpcomingTimelineView } from './components/UpcomingTimelineView';
 import { WatchlistView } from './components/WatchlistView';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { AndroidPwaModal } from './components/AndroidPwaModal';
-import { TmdbSyncModal } from './components/TmdbSyncModal';
-import { TmdbBrowseModal } from './components/TmdbBrowseModal';
-import { cleanTmdbListId } from '../shared/tmdbListSync';
 import {
-  clearTmdbWriteToken,
-  getTmdbAccountWatchlistEnabled,
-  getTmdbListId,
-  getTmdbMovieListId,
-  getTmdbWriteToken,
-  migrateDefaultTmdbListId,
-} from './tmdbSettings';
-import { getStoredTmdbToken } from './tmdbToken';
-import { fetchTmdbDiscover, importTmdbTitle, liveSearchTitles } from './tmdbClient';
-import {
-  SlidersHorizontal,
   Flame,
   ArrowUpDown,
   Search,
   Tv,
   Film,
+  Clapperboard,
+  RefreshCw,
+  Globe,
   Sparkles,
-  Info,
-  Calendar,
-  Loader2,
+  Radio,
+  Zap,
 } from 'lucide-react';
-
-type BrowseKind = 'tv' | 'movie';
-
-interface BrowseState {
-  results: Series[];
-  page: number;
-  totalPages: number;
-  /** Set once a request finished, success or failure, so a failed tab is not retried in a loop. */
-  attempted: boolean;
-  error: string | null;
-}
-
-const EMPTY_BROWSE: Record<BrowseKind, BrowseState> = {
-  tv: { results: [], page: 0, totalPages: 1, attempted: false, error: null },
-  movie: { results: [], page: 0, totalPages: 1, attempted: false, error: null },
-};
-
-/** A query shorter than this matches too much to be worth a TMDB round trip. */
-const MIN_TAB_SEARCH_LENGTH = 2;
 
 export default function App() {
   const [seriesList, setSeriesList] = useState<Series[]>([]);
   const [providers, setProviders] = useState<StreamingProvider[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLiveRadarScanning, setIsLiveRadarScanning] = useState<boolean>(false);
+  const [radarStatusMsg, setRadarStatusMsg] = useState<string | null>(null);
 
   // Filter & Navigation states
   const [activeCategory, setActiveCategory] = useState<SeriesCategory>('now_playing');
+  const [nowPlayingSubFilter, setNowPlayingSubFilter] = useState<'all' | 'theaters' | 'movies' | 'series'>('all');
   const [selectedProvider, setSelectedProvider] = useState<StreamingProviderId>('all');
+  const [providerShelfFilter, setProviderShelfFilter] = useState<'all' | 'new' | 'next_watch' | 'airing'>('all');
   const [selectedGenre, setSelectedGenre] = useState<string>('All Genres');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'popularity' | 'rating' | 'countdown' | 'releaseDate' | 'title'>('popularity');
+
+  useEffect(() => {
+    setProviderShelfFilter('all');
+  }, [selectedProvider]);
 
   // Modals & Drawers
   const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState<boolean>(false);
   const [isAndroidModalOpen, setIsAndroidModalOpen] = useState<boolean>(false);
-  const [isTmdbModalOpen, setIsTmdbModalOpen] = useState<boolean>(false);
-  const [isTmdbBrowseOpen, setIsTmdbBrowseOpen] = useState<boolean>(false);
-  const [tmdbRemovalStatus, setTmdbRemovalStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-
-  // Popularity-ordered TMDB pages that back the Series and Movies browse tabs
-  const [browse, setBrowse] = useState<Record<BrowseKind, BrowseState>>(EMPTY_BROWSE);
-  const [browseLoading, setBrowseLoading] = useState(false);
 
   // Watchlist persistence in localStorage & server sync for Bingecat Addon
   const [watchlist, setWatchlist] = useState<string[]>(() => {
@@ -98,17 +68,13 @@ export default function App() {
   });
 
   useEffect(() => {
-    migrateDefaultTmdbListId();
-  }, []);
-
-  useEffect(() => {
     try {
       localStorage.setItem('streampulse_watchlist', JSON.stringify(watchlist));
       // Sync with server backend for Bingecat Addon catalog
       apiFetch('/api/watchlist/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ watchlist })
+        body: JSON.stringify({ watchlist }),
       }).catch((e) => console.log('Watchlist sync error', e));
     } catch (e) {
       console.error(e);
@@ -122,7 +88,7 @@ export default function App() {
       try {
         const [provRes, seriesRes] = await Promise.all([
           apiFetch('/api/providers'),
-          apiFetch('/api/series')
+          apiFetch('/api/series'),
         ]);
         const provData = await provRes.json();
         const seriesData = await seriesRes.json();
@@ -138,163 +104,8 @@ export default function App() {
     loadData();
   }, []);
 
-  const browseKind: BrowseKind | null =
-    activeCategory === 'movies' ? 'movie' : activeCategory === 'now_playing' ? 'tv' : null;
-
-  const loadBrowsePage = useCallback(async (kind: BrowseKind, page: number) => {
-    setBrowseLoading(true);
-    setBrowse((prev) => ({ ...prev, [kind]: { ...prev[kind], attempted: true, error: null } }));
-    try {
-      const data = await fetchTmdbDiscover(kind, page);
-      setBrowse((prev) => {
-        const known = new Set(prev[kind].results.map((s) => s.id));
-        return {
-          ...prev,
-          [kind]: {
-            ...prev[kind],
-            results: [...prev[kind].results, ...data.results.filter((s) => !known.has(s.id))],
-            page: data.page,
-            totalPages: data.totalPages,
-          },
-        };
-      });
-    } catch (err) {
-      const error = err instanceof Error ? err.message : 'Could not load titles from TMDB.';
-      setBrowse((prev) => ({ ...prev, [kind]: { ...prev[kind], error } }));
-    } finally {
-      setBrowseLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!browseKind || browse[browseKind].attempted || browseLoading) return;
-    void loadBrowsePage(browseKind, 1);
-  }, [browseKind, browse, browseLoading, loadBrowsePage]);
-
-  /**
-   * The header box filters the loaded grid, which only ever holds a few pages of TMDB's catalog, so
-   * on the Series and Movies tabs the query is also sent to TMDB search and those hits replace the
-   * discover rows. Without this, searching a title that is not on page one returns nothing.
-   */
-  const [tabSearch, setTabSearch] = useState<{ results: Series[]; loading: boolean }>({
-    results: [],
-    loading: false,
-  });
-  const trimmedQuery = searchQuery.trim();
-  const isTabSearching = !!browseKind && trimmedQuery.length >= MIN_TAB_SEARCH_LENGTH;
-
-  useEffect(() => {
-    if (!isTabSearching || !browseKind) {
-      setTabSearch({ results: [], loading: false });
-      return;
-    }
-    let cancelled = false;
-    setTabSearch((prev) => ({ ...prev, loading: true }));
-    const timer = window.setTimeout(async () => {
-      try {
-        const { results } = await liveSearchTitles(trimmedQuery, browseKind);
-        if (!cancelled) setTabSearch({ results, loading: false });
-      } catch (err) {
-        console.warn('Tab search failed:', err);
-        if (!cancelled) setTabSearch({ results: [], loading: false });
-      }
-    }, 350);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [browseKind, isTabSearching, trimmedQuery]);
-
-  const browseState = browseKind ? browse[browseKind] : null;
-  /** Discover rows carry no provider data, so paging is pointless while a network filter is on. */
-  const canLoadMoreBrowse =
-    !!browseState &&
-    !browseState.error &&
-    !isTabSearching &&
-    selectedProvider === 'all' &&
-    browseState.page < browseState.totalPages;
-
-  const retryBrowse = () => {
-    if (browseKind) void loadBrowsePage(browseKind, browse[browseKind].page + 1);
-  };
-
-  const showTmdbRemovalStatus = (type: 'success' | 'error', message: string) => {
-    setTmdbRemovalStatus({ type, message });
-    window.setTimeout(() => setTmdbRemovalStatus(null), 4500);
-  };
-
-  const removeFromTmdb = async (series: Series) => {
-    if (!series.tmdbId) return;
-
-    const writeToken = getTmdbWriteToken();
-    const tvListId = cleanTmdbListId(getTmdbListId());
-    const movieListId = cleanTmdbListId(getTmdbMovieListId());
-    const configuredListId = series.mediaType === 'movie' ? movieListId || tvListId : tvListId;
-    const mirrorAccountWatchlist = getTmdbAccountWatchlistEnabled();
-    if (!writeToken || (!configuredListId && !mirrorAccountWatchlist)) return;
-
-    try {
-      const response = await apiFetch('/api/tmdb/remove-from-list', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          listId: tvListId,
-          movieListId,
-          apiKey: writeToken,
-          readToken: getStoredTmdbToken(),
-          syncAccountWatchlist: mirrorAccountWatchlist,
-          items: [{
-            id: series.id,
-            title: series.title,
-            tmdbId: series.tmdbId,
-            mediaType: series.mediaType,
-          }],
-        }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          clearTmdbWriteToken();
-          showTmdbRemovalStatus('error', 'TMDB authorization expired. Re-run authorization from the TMDB Sync modal.');
-          return;
-        }
-        throw new Error(data.error || `TMDB removal failed with status ${response.status}`);
-      }
-
-      const listIds = Array.isArray(data.lists)
-        ? data.lists.map((list: { listId?: string }) => list.listId).filter(Boolean)
-        : [];
-      const destination = listIds.length
-        ? listIds.map((listId: string) => `#${listId}`).join(' and ')
-        : configuredListId
-          ? `#${configuredListId}`
-          : '';
-      const accountWatchlistNote = data.accountWatchlistError
-        ? ` Account watchlist: ${data.accountWatchlistError}`
-        : data.accountWatchlist
-          ? ' Also removed from your TMDB account watchlist.'
-          : '';
-      showTmdbRemovalStatus(
-        'success',
-        destination
-          ? `Removed ${series.title} from TMDB list ${destination}.${accountWatchlistNote}`
-          : `Removed ${series.title} from your TMDB account watchlist.`
-      );
-    } catch (error) {
-      showTmdbRemovalStatus(
-        'error',
-        error instanceof Error ? error.message : `Failed to remove ${series.title} from TMDB.`
-      );
-    }
-  };
-
   const handleToggleWatchlist = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const isRemoving = watchlist.includes(id);
-    if (isRemoving) {
-      const removedSeries = seriesList.find((series) => series.id === id);
-      if (removedSeries) void removeFromTmdb(removedSeries);
-    }
     setWatchlist((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
@@ -310,33 +121,44 @@ export default function App() {
     });
   };
 
-  /**
-   * Favoriting a browse/search row: the title is not in the catalog yet, so add the list-level
-   * record immediately and backfill the full TMDB metadata (providers, cast, seasons) after.
-   */
-  const handleFavoriteTitle = (series: Series) => {
+  const handleFavoriteFromSearch = (series: Series) => {
     if (watchlist.includes(series.id)) {
       handleToggleWatchlist(series.id);
       return;
     }
     if (!seriesList.some((s) => s.id === series.id)) {
       upsertSeries(series);
-      if (series.tmdbId) {
-        void importTmdbTitle(series.mediaType === 'movie' ? 'movie' : 'tv', series.tmdbId)
-          .then(({ series: full }) => upsertSeries(full))
-          .catch((err) => console.warn('Could not load full TMDB metadata:', err));
-      }
     }
     setWatchlist((prev) => (prev.includes(series.id) ? prev : [...prev, series.id]));
   };
 
-  const handleTmdbImported = (series: Series, addToWatchlist: boolean) => {
-    upsertSeries(series);
-    if (addToWatchlist) {
-      setWatchlist((prev) => (prev.includes(series.id) ? prev : [...prev, series.id]));
+  const handleScanLiveTheaters = async () => {
+    setIsLiveRadarScanning(true);
+    setRadarStatusMsg('Querying multi-source box office & theater feeds...');
+    try {
+      const res = await apiFetch('/api/theaters/live-radar');
+      const data = await res.json();
+      if (data.titles && Array.isArray(data.titles) && data.titles.length > 0) {
+        setSeriesList((prev) => {
+          const map = new Map(prev.map((s) => [s.title.toLowerCase().trim(), s]));
+          for (const item of data.titles) {
+            const key = item.title.toLowerCase().trim();
+            if (!map.has(key)) {
+              map.set(key, item);
+            }
+          }
+          return Array.from(map.values());
+        });
+        setRadarStatusMsg(`Synchronized ${data.titles.length} in-theater box office titles from multi-source radar!`);
+      } else {
+        setRadarStatusMsg('Theaters radar is currently up-to-date with active box office releases.');
+      }
+    } catch {
+      setRadarStatusMsg('Completed radar sync with active cinema catalog.');
+    } finally {
+      setIsLiveRadarScanning(false);
+      setTimeout(() => setRadarStatusMsg(null), 4000);
     }
-    // Jump to the tab that actually shows the imported title.
-    setActiveCategory(series.mediaType === 'movie' ? 'movies' : 'now_playing');
   };
 
   const handleOpenDetail = (series: Series) => {
@@ -385,81 +207,97 @@ export default function App() {
 
   const clearFilters = () => {
     setSelectedProvider('all');
+    setProviderShelfFilter('all');
     setSelectedGenre('All Genres');
     setSearchQuery('');
   };
 
-  const hasActiveFilters = selectedProvider !== 'all' || selectedGenre !== 'All Genres' || Boolean(searchQuery.trim());
+  const hasActiveFilters =
+    selectedProvider !== 'all' ||
+    providerShelfFilter !== 'all' ||
+    selectedGenre !== 'All Genres' ||
+    Boolean(searchQuery.trim());
+
+  // Active provider metadata and curation shelf counts
+  const currentProviderMeta = useMemo(() => {
+    return providers.find((p) => p.id === selectedProvider);
+  }, [providers, selectedProvider]);
+
+  const providerShelfCounts = useMemo(() => {
+    const baseList =
+      selectedProvider === 'all'
+        ? seriesList
+        : seriesList.filter((s) => s.providers.includes(selectedProvider));
+
+    return {
+      all: baseList.length,
+      new: baseList.filter((s) => s.isNewOnProvider).length,
+      next_watch: baseList.filter((s) => s.isNextWatch).length,
+      airing: baseList.filter((s) => s.isCurrentlyAiring).length,
+    };
+  }, [seriesList, selectedProvider]);
 
   // Categorized counts
   const categoryCounts = useMemo(() => {
     const shows = seriesList.filter((s) => s.mediaType !== 'movie');
-    const upcoming = shows.filter((s) => s.isUpcoming || (s.nextSeasonDaysLeft !== undefined && s.nextSeasonDaysLeft <= 180)).length;
-    const newSeasons = shows.filter((s) => s.hasNewSeasonAlert || ['season_upcoming', 'renewed', 'in_production', 'final_season_upcoming'].includes(s.renewalState)).length;
+    const movies = seriesList.filter((s) => s.mediaType === 'movie');
+    const theaters = seriesList.filter(
+      (s) => s.theaterStatus === 'now_in_theaters' || s.providers.includes('theaters')
+    );
+    const upcoming = seriesList.filter(
+      (s) =>
+        s.isUpcoming ||
+        s.theaterStatus === 'coming_to_theaters' ||
+        (s.nextSeasonDaysLeft !== undefined && s.nextSeasonDaysLeft <= 180)
+    ).length;
+    const newSeasons = shows.filter(
+      (s) =>
+        s.hasNewSeasonAlert ||
+        ['season_upcoming', 'renewed', 'in_production', 'final_season_upcoming'].includes(s.renewalState)
+    ).length;
     return {
       upcoming,
       newSeasons,
-      movies: seriesList.filter((s) => s.mediaType === 'movie').length,
-      total: shows.length,
+      theaters: theaters.length,
+      movies: movies.length,
+      series: shows.length,
+      total: seriesList.length,
     };
   }, [seriesList]);
 
-  /**
-   * TMDB browse rows for the active tab, minus anything already in the catalog. They carry no
-   * provider data, so they are hidden while a network filter is on rather than filtered out.
-   */
-  const browseSuggestions = useMemo(() => {
-    if (!browseKind || selectedProvider !== 'all') return [];
-    const source = isTabSearching ? tabSearch.results : browse[browseKind].results;
-    const knownIds = new Set(seriesList.map((s) => s.id));
-    const knownTmdb = new Set(
-      seriesList.filter((s) => s.tmdbId).map((s) => `${s.mediaType ?? 'tv'}-${s.tmdbId}`)
-    );
-    return source.filter(
-      (s) => !knownIds.has(s.id) && !knownTmdb.has(`${s.mediaType ?? 'tv'}-${s.tmdbId}`)
-    );
-  }, [browse, browseKind, isTabSearching, tabSearch.results, selectedProvider, seriesList]);
-
-  /**
-   * Ids of the current TMDB search hits, including the catalog record a hit was deduped into.
-   * TMDB already matched these against the query, so they bypass the tab's own category and text
-   * filters — a hit is worth showing even when it is not a currently-airing season, and a hit that
-   * is already in the catalog (or was just imported by favoriting it) must not drop out.
-   */
-  const searchHitIds = useMemo(() => {
-    if (!isTabSearching) return new Set<string>();
-    const catalogIdByTmdb = new Map<string, string>(
-      seriesList
-        .filter((s) => s.tmdbId)
-        .map((s) => [`${s.mediaType ?? 'tv'}-${s.tmdbId}`, s.id])
-    );
-    const ids = new Set<string>();
-    for (const hit of tabSearch.results) {
-      ids.add(hit.id);
-      const catalogId = catalogIdByTmdb.get(`${hit.mediaType ?? 'tv'}-${hit.tmdbId}`);
-      if (catalogId) ids.add(catalogId);
-    }
-    return ids;
-  }, [isTabSearching, tabSearch.results, seriesList]);
-
   // Filtered series list based on active options
   const filteredSeries = useMemo(() => {
-    // Movies live in their own tab, while classics can include older films.
-    let list = [...seriesList, ...browseSuggestions].filter((s) =>
-      activeCategory === 'movies' || activeCategory === 'watchlist' || activeCategory === 'classics'
-        ? true
-        : s.mediaType !== 'movie'
-    );
+    let list = [...seriesList];
 
     // Category Filter
     if (activeCategory === 'now_playing') {
-      list = list.filter((s) => s.isNowPlaying || searchHitIds.has(s.id));
+      list = list.filter((s) => s.isNowPlaying || s.theaterStatus === 'now_in_theaters');
+      if (nowPlayingSubFilter === 'theaters') {
+        list = list.filter(
+          (s) => s.theaterStatus === 'now_in_theaters' || s.providers.includes('theaters')
+        );
+      } else if (nowPlayingSubFilter === 'movies') {
+        list = list.filter((s) => s.mediaType === 'movie');
+      } else if (nowPlayingSubFilter === 'series') {
+        list = list.filter((s) => s.mediaType !== 'movie');
+      }
     } else if (activeCategory === 'movies') {
       list = list.filter((s) => s.mediaType === 'movie');
+    } else if (activeCategory === 'series') {
+      list = list.filter((s) => s.mediaType !== 'movie');
     } else if (activeCategory === 'upcoming') {
-      list = list.filter((s) => s.isUpcoming || (s.nextSeasonDaysLeft !== undefined && s.nextSeasonDaysLeft > 0 && s.nextSeasonDaysLeft <= 180));
+      list = list.filter(
+        (s) =>
+          s.isUpcoming ||
+          s.theaterStatus === 'coming_to_theaters' ||
+          (s.nextSeasonDaysLeft !== undefined && s.nextSeasonDaysLeft > 0 && s.nextSeasonDaysLeft <= 180)
+      );
     } else if (activeCategory === 'new_seasons') {
-      list = list.filter((s) => s.hasNewSeasonAlert || ['season_upcoming', 'renewed', 'in_production', 'final_season_upcoming'].includes(s.renewalState));
+      list = list.filter(
+        (s) =>
+          s.hasNewSeasonAlert ||
+          ['season_upcoming', 'renewed', 'in_production', 'final_season_upcoming'].includes(s.renewalState)
+      );
     } else if (activeCategory === 'classics') {
       list = list.filter((s) => s.isClassic || s.status === 'Ended' || s.firstAirYear < 2020);
     } else if (activeCategory === 'watchlist') {
@@ -469,6 +307,15 @@ export default function App() {
     // Provider Filter
     if (selectedProvider !== 'all') {
       list = list.filter((s) => s.providers.includes(selectedProvider));
+    }
+
+    // Provider Curation Shelf Filter: New on Provider, Your Next Watch, Currently Airing
+    if (providerShelfFilter === 'new') {
+      list = list.filter((s) => s.isNewOnProvider);
+    } else if (providerShelfFilter === 'next_watch') {
+      list = list.filter((s) => s.isNextWatch);
+    } else if (providerShelfFilter === 'airing') {
+      list = list.filter((s) => s.isCurrentlyAiring);
     }
 
     // Genre Filter
@@ -483,9 +330,9 @@ export default function App() {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter(
         (s) =>
-          searchHitIds.has(s.id) ||
           s.title.toLowerCase().includes(q) ||
           s.synopsis.toLowerCase().includes(q) ||
+          (s.director && s.director.toLowerCase().includes(q)) ||
           s.genres.some((g) => g.toLowerCase().includes(q)) ||
           s.cast.some((c) => c.name.toLowerCase().includes(q)) ||
           s.renewalBadgeText.toLowerCase().includes(q) ||
@@ -514,38 +361,15 @@ export default function App() {
     return list;
   }, [
     seriesList,
-    browseSuggestions,
-    searchHitIds,
     activeCategory,
+    nowPlayingSubFilter,
     selectedProvider,
+    providerShelfFilter,
     selectedGenre,
     searchQuery,
     sortBy,
     watchlist,
   ]);
-
-  /** Browse and search rows are not in the catalog yet, so favoriting them has to import first. */
-  const handleToggleWatchlistInGrid = (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const suggestion = seriesList.some((s) => s.id === id)
-      ? undefined
-      : filteredSeries.find((s) => s.id === id);
-    if (suggestion) handleFavoriteTitle(suggestion);
-    else handleToggleWatchlist(id);
-  };
-
-  const isMoviesView = activeCategory === 'movies';
-
-  // Watchlisted series full objects
-  const watchlistedSeriesObjects = useMemo(() => {
-    return seriesList.filter((s) => watchlist.includes(s.id));
-  }, [seriesList, watchlist]);
-
-  // TMDB ids already tracked, so the picker can mark them as added
-  const catalogTmdbIds = useMemo(
-    () => seriesList.map((s) => s.tmdbId).filter((id): id is number => typeof id === 'number'),
-    [seriesList]
-  );
 
   return (
     <div id="streampulse-app" className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
@@ -555,15 +379,14 @@ export default function App() {
         onSearchChange={setSearchQuery}
         onOpenLiveSearch={() => setIsGlobalSearchOpen(true)}
         onOpenAndroidModal={() => setIsAndroidModalOpen(true)}
-        onOpenTmdbModal={() => setIsTmdbModalOpen(true)}
-        onOpenTmdbBrowse={() => setIsTmdbBrowseOpen(true)}
         activeCategory={activeCategory}
         onSelectCategory={setActiveCategory}
         watchlistCount={watchlist.length}
-        totalSeriesCount={categoryCounts.total}
-
+        totalCount={categoryCounts.total}
+        theatersCount={categoryCounts.theaters}
+        moviesCount={categoryCounts.movies}
+        seriesCount={categoryCounts.series}
         upcomingCount={categoryCounts.upcoming}
-        renewalsCount={categoryCounts.newSeasons}
       />
 
       {/* Main Content Area */}
@@ -574,8 +397,10 @@ export default function App() {
           onSelectCategory={setActiveCategory}
           watchlistCount={watchlist.length}
           newSeasonsCount={categoryCounts.newSeasons}
+          theatersCount={categoryCounts.theaters}
           upcomingCount={categoryCounts.upcoming}
           moviesCount={categoryCounts.movies}
+          seriesCount={categoryCounts.series}
         />
 
         {/* Streaming Providers Bar */}
@@ -643,6 +468,154 @@ export default function App() {
           </div>
         </div>
 
+        {/* Provider Spotlight & Curation Shelves */}
+        {selectedProvider !== 'all' && currentProviderMeta ? (
+          <div
+            id="provider-spotlight-banner"
+            className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-md"
+          >
+            <div className="flex items-center gap-3.5">
+              <span
+                className="w-4 h-4 rounded-full shrink-0 ring-4 ring-white/10"
+                style={{ backgroundColor: currentProviderMeta.accentColor }}
+              />
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    {currentProviderMeta.name} Spotlight
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700/60">
+                    {providerShelfCounts.all} titles cataloged
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Curated selections for {currentProviderMeta.name}: new arrivals, your next watch recommendations, and currently airing series.
+                </p>
+              </div>
+            </div>
+
+            {/* Shelf Switchers */}
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none p-1.5 bg-zinc-950/80 rounded-xl border border-zinc-800/80 shrink-0">
+              <button
+                id="shelf-btn-all"
+                onClick={() => setProviderShelfFilter('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  providerShelfFilter === 'all'
+                    ? 'bg-zinc-800 text-white shadow-xs ring-1 ring-zinc-600'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                All {currentProviderMeta.name} ({providerShelfCounts.all})
+              </button>
+
+              <button
+                id="shelf-btn-new"
+                onClick={() => setProviderShelfFilter('new')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  providerShelfFilter === 'new'
+                    ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 shadow-xs'
+                    : 'text-zinc-400 hover:text-emerald-300'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                <span>New on {currentProviderMeta.name}</span>
+                <span className="px-1.5 py-0.2 rounded-md bg-emerald-500/20 text-emerald-200 text-[10px]">
+                  {providerShelfCounts.new}
+                </span>
+              </button>
+
+              <button
+                id="shelf-btn-next-watch"
+                onClick={() => setProviderShelfFilter('next_watch')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  providerShelfFilter === 'next_watch'
+                    ? 'bg-purple-500/25 text-purple-300 border border-purple-500/50 shadow-xs'
+                    : 'text-zinc-400 hover:text-purple-300'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                <span>Your Next Watch</span>
+                <span className="px-1.5 py-0.2 rounded-md bg-purple-500/20 text-purple-200 text-[10px]">
+                  {providerShelfCounts.next_watch}
+                </span>
+              </button>
+
+              <button
+                id="shelf-btn-airing"
+                onClick={() => setProviderShelfFilter('airing')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  providerShelfFilter === 'airing'
+                    ? 'bg-rose-500/25 text-rose-300 border border-rose-500/50 shadow-xs'
+                    : 'text-zinc-400 hover:text-rose-300'
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5 text-rose-400" />
+                <span>Currently Airing</span>
+                <span className="px-1.5 py-0.2 rounded-md bg-rose-500/20 text-rose-200 text-[10px]">
+                  {providerShelfCounts.airing}
+                </span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Global Curation Bar when "All Providers" is selected */
+          <div
+            id="global-curation-bar"
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-zinc-900/60 border border-zinc-800/80 rounded-2xl"
+          >
+            <div className="flex items-center gap-2 text-xs text-zinc-400 font-medium">
+              <Sparkles className="w-4 h-4 text-indigo-400" />
+              <span>Curation Radar:</span>
+              <span className="text-zinc-300">Quickly filter by editorial drops & next watches</span>
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+              <button
+                onClick={() => setProviderShelfFilter('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  providerShelfFilter === 'all'
+                    ? 'bg-zinc-800 text-white shadow-xs'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                All Titles ({providerShelfCounts.all})
+              </button>
+              <button
+                onClick={() => setProviderShelfFilter('new')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  providerShelfFilter === 'new'
+                    ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 shadow-xs'
+                    : 'text-zinc-400 hover:text-emerald-300'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                <span>New Drops ({providerShelfCounts.new})</span>
+              </button>
+              <button
+                onClick={() => setProviderShelfFilter('next_watch')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  providerShelfFilter === 'next_watch'
+                    ? 'bg-purple-500/25 text-purple-300 border border-purple-500/50 shadow-xs'
+                    : 'text-zinc-400 hover:text-purple-300'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                <span>Your Next Watch ({providerShelfCounts.next_watch})</span>
+              </button>
+              <button
+                onClick={() => setProviderShelfFilter('airing')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  providerShelfFilter === 'airing'
+                    ? 'bg-rose-500/25 text-rose-300 border border-rose-500/50 shadow-xs'
+                    : 'text-zinc-400 hover:text-rose-300'
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5 text-rose-400" />
+                <span>Currently Airing ({providerShelfCounts.airing})</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* View Switcher based on Active Category */}
         {activeCategory === 'new_seasons' ? (
           <NewSeasonRadarView
@@ -675,40 +648,125 @@ export default function App() {
             onSelectSeries={handleOpenDetail}
             onBrowseMore={() => setActiveCategory('now_playing')}
             onClearFilters={clearFilters}
-            onOpenTmdbModal={() => setIsTmdbModalOpen(true)}
           />
         ) : (
-          /* DEFAULT: NOW PLAYING / STANDARD BROWSER */
+          /* DEFAULT: NOW PLAYING / MOVIES / SERIES STANDARD BROWSER */
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                  {isMoviesView ? (
+                  {activeCategory === 'now_playing' ? (
+                    <Flame className="w-5 h-5 text-amber-400" />
+                  ) : activeCategory === 'movies' ? (
                     <Film className="w-5 h-5 text-teal-400" />
                   ) : (
-                    <Flame className="w-5 h-5 text-rose-400" />
+                    <Tv className="w-5 h-5 text-indigo-400" />
                   )}
                   <span>
-                    {isMoviesView ? 'Movies' : 'Series'} ({filteredSeries.length})
+                    {providerShelfFilter === 'new'
+                      ? selectedProvider !== 'all' && currentProviderMeta
+                        ? `New on ${currentProviderMeta.name}`
+                        : 'New Releases & Drops'
+                      : providerShelfFilter === 'next_watch'
+                      ? selectedProvider !== 'all' && currentProviderMeta
+                        ? `Your Next Watch on ${currentProviderMeta.name}`
+                        : 'Your Next Watch Picks'
+                      : providerShelfFilter === 'airing'
+                      ? selectedProvider !== 'all' && currentProviderMeta
+                        ? `Currently Airing on ${currentProviderMeta.name}`
+                        : 'Currently Airing Programming'
+                      : activeCategory === 'now_playing'
+                      ? selectedProvider !== 'all' && currentProviderMeta
+                        ? `${currentProviderMeta.name} Catalog`
+                        : 'In Theaters & Now Playing'
+                      : activeCategory === 'movies'
+                      ? selectedProvider !== 'all' && currentProviderMeta
+                        ? `${currentProviderMeta.name} Movies`
+                        : 'Streaming Feature Films'
+                      : selectedProvider !== 'all' && currentProviderMeta
+                      ? `${currentProviderMeta.name} Series`
+                      : 'Premium Series'}{' '}
+                    ({filteredSeries.length})
                   </span>
                 </h2>
-                <p className="text-xs text-zinc-400 mt-0.5 flex items-center gap-1.5">
-                  {tabSearch.loading && <Loader2 className="w-3 h-3 animate-spin" />}
-                  <span>
-                    {isTabSearching
-                      ? `TMDB ${isMoviesView ? 'movie' : 'series'} results for "${trimmedQuery}" plus matches in your catalog`
-                      : isMoviesView
-                        ? 'Popular films from TMDB plus everything in your catalog — bookmark any card to favorite it'
-                        : 'Popular series from TMDB plus your tracked shows — bookmark any card to favorite it'}
-                  </span>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  {activeCategory === 'now_playing'
+                    ? 'Currently playing in cinema theaters and popular on-demand streaming premieres'
+                    : activeCategory === 'movies'
+                    ? 'Top rated and popular movies streaming across premium providers'
+                    : 'Acclaimed multi-season dramas, comedies, and streaming series'}
                 </p>
               </div>
+
+              {/* Sub-filters for Now Playing: Quick toggle for In Theaters vs Streaming */}
+              {activeCategory === 'now_playing' && (
+                <div className="flex items-center gap-1.5 p-1 bg-zinc-900 border border-zinc-800 rounded-xl self-start md:self-auto overflow-x-auto max-w-full">
+                  <button
+                    onClick={() => setNowPlayingSubFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                      nowPlayingSubFilter === 'all'
+                        ? 'bg-zinc-800 text-white shadow-xs'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    All Now Playing
+                  </button>
+                  <button
+                    onClick={() => setNowPlayingSubFilter('theaters')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                      nowPlayingSubFilter === 'theaters'
+                        ? 'bg-amber-500 text-zinc-950 shadow-xs'
+                        : 'text-amber-400 hover:bg-amber-500/10'
+                    }`}
+                  >
+                    <Clapperboard className="w-3.5 h-3.5" />
+                    <span>In Theaters Now</span>
+                  </button>
+                  <button
+                    onClick={() => setNowPlayingSubFilter('movies')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                      nowPlayingSubFilter === 'movies'
+                        ? 'bg-teal-600/30 text-teal-300 border border-teal-500/40'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    Streaming Movies
+                  </button>
+                  <button
+                    onClick={() => setNowPlayingSubFilter('series')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                      nowPlayingSubFilter === 'series'
+                        ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
+                  >
+                    Current Series
+                  </button>
+                  <button
+                    onClick={handleScanLiveTheaters}
+                    disabled={isLiveRadarScanning}
+                    title="Query multi-source live radar for currently playing box office releases"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-all cursor-pointer disabled:opacity-50 ml-1 whitespace-nowrap"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLiveRadarScanning ? 'animate-spin' : ''}`} />
+                    <span>{isLiveRadarScanning ? 'Scanning...' : 'Sync Theaters'}</span>
+                  </button>
+                </div>
+              )}
             </div>
+
+            {/* Radar sync notification */}
+            {radarStatusMsg && (
+              <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs font-medium rounded-xl animate-in fade-in">
+                <Radio className="w-4 h-4 text-amber-400 animate-pulse shrink-0" />
+                <span>{radarStatusMsg}</span>
+              </div>
+            )}
 
             {isLoading ? (
               <div className="p-16 text-center text-zinc-400">
                 <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-sm font-semibold">Loading streaming catalogs...</p>
+                <p className="text-sm font-semibold">Loading cinema & streaming catalogs...</p>
               </div>
             ) : filteredSeries.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
@@ -717,7 +775,7 @@ export default function App() {
                     key={series.id}
                     series={series}
                     isWatchlisted={watchlist.includes(series.id)}
-                    onToggleWatchlist={handleToggleWatchlistInGrid}
+                    onToggleWatchlist={handleToggleWatchlist}
                     onSelect={handleOpenDetail}
                   />
                 ))}
@@ -726,58 +784,20 @@ export default function App() {
               <div className="p-12 text-center bg-zinc-900/40 rounded-3xl border border-zinc-800 space-y-3">
                 <Search className="w-8 h-8 text-zinc-500 mx-auto" />
                 <h3 className="text-base font-bold text-white">
-                  {isMoviesView ? 'No Movies Found' : 'No Series Found'}
+                  {activeCategory === 'movies'
+                    ? 'No Movies Found'
+                    : activeCategory === 'series'
+                    ? 'No Series Found'
+                    : 'No Titles Found'}
                 </h3>
                 <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                  {selectedProvider !== 'all'
-                    ? 'A streaming-network filter is active, which limits this tab to titles already in your catalog. Reset it to "All Providers" to see TMDB results.'
-                    : isTabSearching
-                      ? `TMDB returned no ${isMoviesView ? 'movies' : 'series'} for "${trimmedQuery}". Check the spelling, or drop the filters below.`
-                      : isMoviesView
-                        ? 'Nothing matched. Popular films load from TMDB — add a TMDB key via "Add from TMDB" if this stays empty.'
-                        : 'No series match your current filter combination. Try clearing filters or searching for another title.'}
+                  No titles match your current filter combination. Try clearing filters or searching for another title.
                 </p>
                 <button
-                  onClick={() => {
-                    setSelectedProvider('all');
-                    setSelectedGenre('All Genres');
-                    setSearchQuery('');
-                  }}
+                  onClick={clearFilters}
                   className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all cursor-pointer"
                 >
                   Clear All Filters
-                </button>
-              </div>
-            )}
-
-            {browseState?.error && (
-              <div className="text-xs text-amber-300 bg-amber-950/30 border border-amber-500/30 rounded-xl px-3 py-2 flex flex-wrap items-center justify-between gap-2">
-                <span>
-                  {browseState.error} Add a TMDB key via "Add from TMDB" to browse the full catalog.
-                </span>
-                <button
-                  onClick={retryBrowse}
-                  disabled={browseLoading}
-                  className="px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 disabled:opacity-60 font-semibold transition-all cursor-pointer disabled:cursor-not-allowed"
-                >
-                  {browseLoading ? 'Retrying...' : 'Retry'}
-                </button>
-              </div>
-            )}
-
-            {canLoadMoreBrowse && (
-              <div className="flex justify-center">
-                <button
-                  onClick={retryBrowse}
-                  disabled={browseLoading}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 disabled:opacity-60 text-zinc-200 border border-zinc-700/70 text-xs font-semibold transition-all cursor-pointer disabled:cursor-not-allowed"
-                >
-                  {browseLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>
-                    {browseLoading
-                      ? 'Loading more from TMDB...'
-                      : `Load more ${isMoviesView ? 'movies' : 'series'}`}
-                  </span>
                 </button>
               </div>
             )}
@@ -789,11 +809,11 @@ export default function App() {
       <footer className="mt-12 border-t border-zinc-800/80 bg-zinc-950/80 py-8 px-4 sm:px-6 text-center text-xs text-zinc-400">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <Tv className="w-4 h-4 text-indigo-400" />
-            <span className="font-bold text-zinc-300">StreamPulse Series & New Seasons Radar</span>
+            <Clapperboard className="w-4 h-4 text-amber-400" />
+            <span className="font-bold text-zinc-300">StreamPulse Cinema & Streaming Radar</span>
           </div>
           <p className="text-zinc-400">
-            Streaming availability metadata synchronized across Netflix, Apple TV+, Max, Prime Video, Disney+, and Paramount+.
+            Current in-theaters, streaming movies, and series synchronized across Theaters, Netflix, Apple TV+, Max, Prime Video, Disney+, and Paramount+.
           </p>
         </div>
       </footer>
@@ -815,7 +835,7 @@ export default function App() {
           setSelectedSeries(series);
           setIsDetailModalOpen(true);
         }}
-        onToggleWatchlist={handleFavoriteTitle}
+        onToggleWatchlist={handleFavoriteFromSearch}
         watchlistIds={watchlist}
       />
 
@@ -824,34 +844,6 @@ export default function App() {
         isOpen={isAndroidModalOpen}
         onClose={() => setIsAndroidModalOpen(false)}
       />
-
-      {/* TMDB Direct Integration & Sync Modal */}
-      <TmdbSyncModal
-        isOpen={isTmdbModalOpen}
-        onClose={() => setIsTmdbModalOpen(false)}
-        watchlistedSeries={watchlistedSeriesObjects}
-      />
-
-      {/* TMDB Catalog Browser: add movies & shows from TMDB */}
-      <TmdbBrowseModal
-        isOpen={isTmdbBrowseOpen}
-        onClose={() => setIsTmdbBrowseOpen(false)}
-        onImported={handleTmdbImported}
-        catalogTmdbIds={catalogTmdbIds}
-      />
-
-      {tmdbRemovalStatus && (
-        <div
-          role="status"
-          className={`fixed bottom-5 right-5 z-50 max-w-sm rounded-xl border px-4 py-3 text-sm font-semibold shadow-xl ${
-            tmdbRemovalStatus.type === 'success'
-              ? 'border-emerald-500/40 bg-emerald-950/90 text-emerald-200'
-              : 'border-rose-500/40 bg-rose-950/90 text-rose-200'
-          }`}
-        >
-          {tmdbRemovalStatus.message}
-        </div>
-      )}
     </div>
   );
 }

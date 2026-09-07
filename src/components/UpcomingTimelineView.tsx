@@ -29,13 +29,13 @@ export const UpcomingTimelineView: React.FC<UpcomingTimelineViewProps> = ({
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold mb-3">
               <Calendar className="w-3.5 h-3.5" />
-              <span>PREMIERE SCHEDULE & COUNTDOWNS</span>
+              <span>THEATRICAL & STREAMING CALENDAR</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Upcoming Series & Returning Seasons Calendar
+              Upcoming Movies & Series Premieres
             </h2>
             <p className="text-xs sm:text-sm text-zinc-300 mt-2 leading-relaxed">
-              Track the exact release schedule and countdown timers for new seasons and series arriving in the coming weeks and months.
+              Track the exact release schedule and countdown timers for upcoming cinema releases, streaming feature films, and returning series arriving in the coming weeks and months.
             </p>
           </div>
 

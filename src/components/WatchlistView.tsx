@@ -1,7 +1,7 @@
 import React from 'react';
 import { Series } from '../types';
 import { SeriesCard } from './SeriesCard';
-import { Bookmark, Bell, ArrowRight, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { Bookmark, Bell, ArrowRight, SlidersHorizontal } from 'lucide-react';
 
 interface WatchlistViewProps {
   watchlistedSeries: Series[];
@@ -12,7 +12,6 @@ interface WatchlistViewProps {
   onSelectSeries: (series: Series) => void;
   onBrowseMore: () => void;
   onClearFilters: () => void;
-  onOpenTmdbModal?: () => void;
 }
 
 export const WatchlistView: React.FC<WatchlistViewProps> = ({
@@ -24,7 +23,6 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
   onSelectSeries,
   onBrowseMore,
   onClearFilters,
-  onOpenTmdbModal,
 }) => {
   const showsWithNewSeasons = watchlistedSeries.filter(
     (s) => s.hasNewSeasonAlert || ['season_upcoming', 'renewed', 'in_production', 'final_season_upcoming'].includes(s.renewalState)
@@ -41,15 +39,6 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
                 <Bookmark className="w-3.5 h-3.5" />
                 <span>MY PERSONAL TRACKER</span>
               </div>
-              {onOpenTmdbModal && (
-                <button
-                  onClick={onOpenTmdbModal}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 text-teal-300 text-xs font-bold transition-all cursor-pointer shadow-xs"
-                >
-                  <RefreshCw className="w-3 h-3 text-teal-400" />
-                  <span>Sync with TMDB</span>
-                </button>
-              )}
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
               My Watchlist & Season Alerts

@@ -148,9 +148,7 @@ export const ClassicsExplorerView: React.FC<ClassicsExplorerViewProps> = ({
                 : 'No classic titles in this decade category.'}
             </p>
             <p className="text-xs text-zinc-500 mt-1">
-              {selectedMediaKind === 'movies'
-                ? 'Add classic films through "Add from TMDB", or try another decade.'
-                : "Try selecting 'All Decades' or clearing filters."}
+              Try selecting 'All Decades' or clearing filters.
             </p>
           </div>
         )}

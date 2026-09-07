@@ -1,31 +1,31 @@
 import { Series } from '../src/types';
 
-// Map of popular series to IMDb IDs for instant 100% TMDB stream resolution in Bingecat / Stremio
-export const IMDB_MAPPING: Record<string, { imdbId: string; tmdbId?: number }> = {
-  'severance': { imdbId: 'tt11280740', tmdbId: 95396 },
-  'the-last-of-us': { imdbId: 'tt3581920', tmdbId: 100088 },
-  'stranger-things': { imdbId: 'tt4574334', tmdbId: 66732 },
-  'house-of-the-dragon': { imdbId: 'tt11198330', tmdbId: 94997 },
-  'the-bear': { imdbId: 'tt14452776', tmdbId: 136315 },
-  'the-white-lotus': { imdbId: 'tt13406094', tmdbId: 111803 },
-  'shogun': { imdbId: 'tt2788316', tmdbId: 126308 },
-  'slow-horses': { imdbId: 'tt5875444', tmdbId: 95480 },
-  'fallout': { imdbId: 'tt12637874', tmdbId: 106379 },
-  'silo': { imdbId: 'tt14688458', tmdbId: 125988 },
-  'wednesday': { imdbId: 'tt13443470', tmdbId: 119051 },
-  'succession': { imdbId: 'tt7660850', tmdbId: 76331 },
-  'breaking-bad': { imdbId: 'tt0903747', tmdbId: 1396 },
-  'game-of-thrones': { imdbId: 'tt0944947', tmdbId: 1399 },
-  'the-sopranos': { imdbId: 'tt0141842', tmdbId: 1398 },
-  'the-wire': { imdbId: 'tt0306414', tmdbId: 1438 },
-  'dark': { imdbId: 'tt5753856', tmdbId: 70523 },
-  'mindhunter': { imdbId: 'tt5290382', tmdbId: 67744 },
-  'ted-lasso': { imdbId: 'tt10986410', tmdbId: 97546 },
-  'squid-game': { imdbId: 'tt10919420', tmdbId: 93405 },
-  'peaky-blinders': { imdbId: 'tt2442560', tmdbId: 60574 },
-  'true-detective': { imdbId: 'tt2356777', tmdbId: 46648 },
-  'fargo': { imdbId: 'tt2802850', tmdbId: 60622 },
-  'the-boys': { imdbId: 'tt1190634', tmdbId: 76479 },
+// Map of popular series to IMDb IDs for stream resolution in Bingecat / Stremio
+export const IMDB_MAPPING: Record<string, { imdbId: string }> = {
+  'severance': { imdbId: 'tt11280740' },
+  'the-last-of-us': { imdbId: 'tt3581920' },
+  'stranger-things': { imdbId: 'tt4574334' },
+  'house-of-the-dragon': { imdbId: 'tt11198330' },
+  'the-bear': { imdbId: 'tt14452776' },
+  'the-white-lotus': { imdbId: 'tt13406094' },
+  'shogun': { imdbId: 'tt2788316' },
+  'slow-horses': { imdbId: 'tt5875444' },
+  'fallout': { imdbId: 'tt12637874' },
+  'silo': { imdbId: 'tt14688458' },
+  'wednesday': { imdbId: 'tt13443470' },
+  'succession': { imdbId: 'tt7660850' },
+  'breaking-bad': { imdbId: 'tt0903747' },
+  'game-of-thrones': { imdbId: 'tt0944947' },
+  'the-sopranos': { imdbId: 'tt0141842' },
+  'the-wire': { imdbId: 'tt0306414' },
+  'dark': { imdbId: 'tt5753856' },
+  'mindhunter': { imdbId: 'tt5290382' },
+  'ted-lasso': { imdbId: 'tt10986410' },
+  'squid-game': { imdbId: 'tt10919420' },
+  'peaky-blinders': { imdbId: 'tt2442560' },
+  'true-detective': { imdbId: 'tt2356777' },
+  'fargo': { imdbId: 'tt2802850' },
+  'the-boys': { imdbId: 'tt1190634' },
 };
 
 export function getAddonManifest(baseUrl: string) {
@@ -64,7 +64,7 @@ export function getAddonManifest(baseUrl: string) {
         extra: [{ name: 'search', isRequired: false }]
       }
     ],
-    idPrefixes: ['tt', 'tmdb:', 'streampulse:']
+    idPrefixes: ['tt', 'streampulse:']
   };
 }
 

@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { AISeasonIntel } from "../src/types";
+import { AISeasonIntel, Series } from "../src/types";
 
 let aiClient: GoogleGenAI | null = null;
 
@@ -52,7 +52,7 @@ ${currentContext ? `Context details: ${currentContext}` : ''}
 Provide a structured analysis for fans tracking new seasons and release schedules.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+      model: 'gemini-3.8-flash',
       contents: prompt,
       config: {
         systemInstruction: "You are a television industry expert and streaming series renewal analyst. Provide accurate, concise, and insightful intelligence on season renewals, upcoming release dates, filming status, and storyline expectations.",
@@ -112,3 +112,111 @@ Provide a structured analysis for fans tracking new seasons and release schedule
     };
   }
 }
+
+/**
+ * Real-time AI Cinema Radar: fetches live in-theaters movies and upcoming theatrical intelligence.
+ */
+export async function fetchLiveTheatersRadar(): Promise<Partial<Series>[]> {
+  const ai = getAI();
+  if (!ai) return [];
+
+  try {
+    const prompt = `Provide the top 6 movies currently playing in movie theaters right now.
+For each movie include:
+- title
+- tagline
+- synopsis (concise 2-sentence overview)
+- releaseYear (e.g. 2024, 2025, or 2026)
+- runtimeMinutes
+- director
+- genres (array of strings, e.g. ["Action", "Sci-Fi"])
+- boxOffice (e.g. "$650M Worldwide" or current gross)
+- rating (e.g. 8.4)
+- theaterStatus: "now_in_theaters"`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: {
+        systemInstruction: 'You are a real-time box office analyst and cinema curator. Return valid JSON only.',
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              tagline: { type: Type.STRING },
+              synopsis: { type: Type.STRING },
+              releaseYear: { type: Type.INTEGER },
+              runtimeMinutes: { type: Type.INTEGER },
+              director: { type: Type.STRING },
+              genres: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              },
+              boxOffice: { type: Type.STRING },
+              rating: { type: Type.NUMBER },
+              theaterStatus: { type: Type.STRING }
+            },
+            required: ['title', 'synopsis', 'releaseYear', 'genres', 'director', 'theaterStatus']
+          }
+        }
+      }
+    });
+
+    const text = response.text;
+    if (!text) return [];
+
+    const rawList = JSON.parse(text) as Array<{
+      title: string;
+      tagline?: string;
+      synopsis: string;
+      releaseYear: number;
+      runtimeMinutes?: number;
+      director?: string;
+      genres: string[];
+      boxOffice?: string;
+      rating?: number;
+      theaterStatus?: string;
+    }>;
+
+    return rawList.map((item) => ({
+      id: `ai-radar-${item.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+      mediaType: 'movie',
+      title: item.title,
+      tagline: item.tagline || 'In Theaters Worldwide',
+      synopsis: item.synopsis,
+      posterUrl: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&auto=format&fit=crop&q=80',
+      backdropUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1600&auto=format&fit=crop&q=80',
+      providers: ['theaters'],
+      primaryProvider: 'theaters',
+      genres: item.genres || ['Drama'],
+      rating: item.rating || 8.1,
+      ratingCount: 'Live Cinema Radar',
+      contentRating: 'PG-13',
+      firstAirYear: item.releaseYear || 2024,
+      decade: '2020s',
+      totalSeasons: 1,
+      totalEpisodes: 1,
+      runtimeMinutes: item.runtimeMinutes || 120,
+      theaterStatus: 'now_in_theaters',
+      boxOffice: item.boxOffice || 'Box Office Active',
+      director: item.director,
+      status: 'In Theaters',
+      isNowPlaying: true,
+      isUpcoming: false,
+      isClassic: false,
+      hasNewSeasonAlert: false,
+      renewalState: 'airing_now',
+      renewalBadgeText: 'Live Cinema Radar',
+      cast: [],
+      source: 'gemini_radar',
+      seasons: []
+    }));
+  } catch (err) {
+    console.warn('Gemini Live Theaters Radar error (falling back to curated radar):', err);
+    return [];
+  }
+}
+
