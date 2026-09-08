@@ -2,7 +2,7 @@ import React from 'react';
 import { Series } from '../types';
 import { ProviderBadge } from './ProviderBadge';
 import { StatusBadge } from './StatusBadge';
-import { Star, Bookmark, Calendar, Film, Bell, Check, Clapperboard, Clock, Zap, Radio, Sparkles } from 'lucide-react';
+import { Star, Bookmark, Calendar, Film, Bell, Check, Clapperboard, Clock, Zap, Radio, Sparkles, Tv } from 'lucide-react';
 
 interface SeriesCardProps {
   series: Series;
@@ -131,7 +131,7 @@ export const SeriesCard: React.FC<SeriesCardProps> = ({
                 </>
               ) : (
                 <>
-                  <Film className="w-3 h-3 text-zinc-500" />
+                  <Tv className="w-3 h-3 text-zinc-500" />
                   {`${series.totalSeasons} ${series.totalSeasons === 1 ? 'Season' : 'Seasons'}`}
                 </>
               )}

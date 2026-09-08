@@ -32,8 +32,8 @@ export const CategoryTabs: React.FC<CategoryTabsProps> = ({
   }> = [
     {
       id: 'now_playing',
-      label: 'In Theaters & Now Playing',
-      description: 'Currently in theaters and hot streaming releases',
+      label: 'In Theaters',
+      description: 'Movies currently playing in theaters',
       icon: Clapperboard,
       badge: theatersCount > 0 ? theatersCount : undefined,
       badgeHighlight: true,
@@ -41,21 +41,21 @@ export const CategoryTabs: React.FC<CategoryTabsProps> = ({
     {
       id: 'movies',
       label: 'Streaming Movies',
-      description: 'Feature films across premium providers',
+      description: 'Feature films available across streaming platforms',
       icon: Film,
       badge: moviesCount > 0 ? moviesCount : undefined,
     },
     {
       id: 'series',
-      label: 'Premium Series',
-      description: 'Top streaming series & season status',
+      label: 'Premier Series',
+      description: 'Acclaimed TV series & season renewal status',
       icon: Tv,
       badge: seriesCount > 0 ? seriesCount : undefined,
     },
     {
       id: 'upcoming',
       label: 'Upcoming & Future',
-      description: 'Theatrical releases & upcoming seasons',
+      description: 'Upcoming theatrical releases & new seasons',
       icon: Calendar,
       badge: upcomingCount,
     },

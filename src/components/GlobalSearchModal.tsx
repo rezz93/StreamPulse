@@ -65,6 +65,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
   const filteredResults = results.filter((item) => {
     if (filterType === 'theaters') {
+      if (item.mediaType !== 'movie') return false;
       if (item.theaterStatus !== 'now_in_theaters' && !item.providers.includes('theaters')) return false;
     } else if (filterType === 'movies') {
       if (item.mediaType !== 'movie') return false;
@@ -183,7 +184,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                   { id: 'all', label: `All (${results.length})` },
                   {
                     id: 'theaters',
-                    label: `In Theaters (${results.filter((s) => s.theaterStatus === 'now_in_theaters' || s.providers.includes('theaters')).length})`,
+                    label: `In Theaters (${results.filter((s) => s.mediaType === 'movie' && (s.theaterStatus === 'now_in_theaters' || s.providers.includes('theaters'))).length})`,
                   },
                   {
                     id: 'movies',

@@ -41,7 +41,6 @@ export default function App() {
 
   // Filter & Navigation states
   const [activeCategory, setActiveCategory] = useState<SeriesCategory>('now_playing');
-  const [nowPlayingSubFilter, setNowPlayingSubFilter] = useState<'all' | 'theaters' | 'movies' | 'series'>('all');
   const [selectedProvider, setSelectedProvider] = useState<StreamingProviderId>('all');
   const [providerShelfFilter, setProviderShelfFilter] = useState<'all' | 'new' | 'next_watch' | 'airing'>('all');
   const [selectedGenre, setSelectedGenre] = useState<string>('All Genres');
@@ -242,15 +241,23 @@ export default function App() {
   // Categorized counts
   const categoryCounts = useMemo(() => {
     const shows = seriesList.filter((s) => s.mediaType !== 'movie');
-    const movies = seriesList.filter((s) => s.mediaType === 'movie');
-    const theaters = seriesList.filter(
-      (s) => s.theaterStatus === 'now_in_theaters' || s.providers.includes('theaters')
+    const allMovies = seriesList.filter((s) => s.mediaType === 'movie');
+    const theaters = allMovies.filter(
+      (s) =>
+        s.theaterStatus === 'now_in_theaters' ||
+        (s.providers.includes('theaters') && s.theaterStatus !== 'coming_to_theaters' && !s.isUpcoming)
+    );
+    const streamingMovies = allMovies.filter(
+      (s) =>
+        s.theaterStatus !== 'now_in_theaters' &&
+        s.theaterStatus !== 'coming_to_theaters' &&
+        !s.isUpcoming
     );
     const upcoming = seriesList.filter(
       (s) =>
         s.isUpcoming ||
         s.theaterStatus === 'coming_to_theaters' ||
-        (s.nextSeasonDaysLeft !== undefined && s.nextSeasonDaysLeft <= 180)
+        (s.nextSeasonDaysLeft !== undefined && s.nextSeasonDaysLeft > 0 && s.nextSeasonDaysLeft <= 180)
     ).length;
     const newSeasons = shows.filter(
       (s) =>
@@ -261,7 +268,7 @@ export default function App() {
       upcoming,
       newSeasons,
       theaters: theaters.length,
-      movies: movies.length,
+      movies: streamingMovies.length,
       series: shows.length,
       total: seriesList.length,
     };
@@ -271,21 +278,26 @@ export default function App() {
   const filteredSeries = useMemo(() => {
     let list = [...seriesList];
 
-    // Category Filter
+    // Category Filter: Strict taxonomy separation
     if (activeCategory === 'now_playing') {
-      list = list.filter((s) => s.isNowPlaying || s.theaterStatus === 'now_in_theaters');
-      if (nowPlayingSubFilter === 'theaters') {
-        list = list.filter(
-          (s) => s.theaterStatus === 'now_in_theaters' || s.providers.includes('theaters')
-        );
-      } else if (nowPlayingSubFilter === 'movies') {
-        list = list.filter((s) => s.mediaType === 'movie');
-      } else if (nowPlayingSubFilter === 'series') {
-        list = list.filter((s) => s.mediaType !== 'movie');
-      }
+      // IN THEATERS: ONLY movies currently playing in cinema theaters
+      list = list.filter(
+        (s) =>
+          s.mediaType === 'movie' &&
+          (s.theaterStatus === 'now_in_theaters' ||
+            (s.providers.includes('theaters') && s.theaterStatus !== 'coming_to_theaters' && !s.isUpcoming))
+      );
     } else if (activeCategory === 'movies') {
-      list = list.filter((s) => s.mediaType === 'movie');
+      // STREAMING MOVIES: ONLY feature films on streaming platforms
+      list = list.filter(
+        (s) =>
+          s.mediaType === 'movie' &&
+          s.theaterStatus !== 'now_in_theaters' &&
+          s.theaterStatus !== 'coming_to_theaters' &&
+          !s.isUpcoming
+      );
     } else if (activeCategory === 'series') {
+      // PREMIER SERIES: ONLY television and streaming series
       list = list.filter((s) => s.mediaType !== 'movie');
     } else if (activeCategory === 'upcoming') {
       list = list.filter(
@@ -364,7 +376,6 @@ export default function App() {
   }, [
     seriesList,
     activeCategory,
-    nowPlayingSubFilter,
     selectedProvider,
     providerShelfFilter,
     selectedGenre,
@@ -681,80 +692,57 @@ export default function App() {
                         : 'Currently Airing Programming'
                       : activeCategory === 'now_playing'
                       ? selectedProvider !== 'all' && currentProviderMeta
-                        ? `${currentProviderMeta.name} Catalog`
-                        : 'In Theaters & Now Playing'
+                        ? `${currentProviderMeta.name} in Theaters`
+                        : 'In Theaters'
                       : activeCategory === 'movies'
                       ? selectedProvider !== 'all' && currentProviderMeta
                         ? `${currentProviderMeta.name} Movies`
-                        : 'Streaming Feature Films'
+                        : 'Streaming Movies'
                       : selectedProvider !== 'all' && currentProviderMeta
                       ? `${currentProviderMeta.name} Series`
-                      : 'Premium Series'}{' '}
+                      : 'Premier Series'}{' '}
                     ({filteredSeries.length})
                   </span>
                 </h2>
                 <p className="text-xs text-zinc-400 mt-0.5">
                   {activeCategory === 'now_playing'
-                    ? 'Currently playing in cinema theaters and popular on-demand streaming premieres'
+                    ? 'Feature films currently playing on the big screen in cinema theaters'
                     : activeCategory === 'movies'
-                    ? 'Top rated and popular movies streaming across premium providers'
-                    : 'Acclaimed multi-season dramas, comedies, and streaming series'}
+                    ? 'Feature films available to stream across premium platforms'
+                    : 'Acclaimed multi-season dramas, comedies, and premier television series'}
                 </p>
               </div>
 
-              {/* Sub-filters for Now Playing: Quick toggle for In Theaters vs Streaming */}
+              {/* Category-specific indicator badges & actions */}
               {activeCategory === 'now_playing' && (
-                <div className="flex items-center gap-1.5 p-1 bg-zinc-900 border border-zinc-800 rounded-xl self-start md:self-auto overflow-x-auto max-w-full">
-                  <button
-                    onClick={() => setNowPlayingSubFilter('all')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                      nowPlayingSubFilter === 'all'
-                        ? 'bg-zinc-800 text-white shadow-xs'
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    All Now Playing
-                  </button>
-                  <button
-                    onClick={() => setNowPlayingSubFilter('theaters')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
-                      nowPlayingSubFilter === 'theaters'
-                        ? 'bg-amber-500 text-zinc-950 shadow-xs'
-                        : 'text-amber-400 hover:bg-amber-500/10'
-                    }`}
-                  >
-                    <Clapperboard className="w-3.5 h-3.5" />
-                    <span>In Theaters Now</span>
-                  </button>
-                  <button
-                    onClick={() => setNowPlayingSubFilter('movies')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                      nowPlayingSubFilter === 'movies'
-                        ? 'bg-teal-600/30 text-teal-300 border border-teal-500/40'
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    Streaming Movies
-                  </button>
-                  <button
-                    onClick={() => setNowPlayingSubFilter('series')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                      nowPlayingSubFilter === 'series'
-                        ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
-                        : 'text-zinc-400 hover:text-zinc-200'
-                    }`}
-                  >
-                    Current Series
-                  </button>
+                <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-semibold">
+                    <Clapperboard className="w-3.5 h-3.5 text-amber-400" />
+                    <span>In Theaters Only</span>
+                  </div>
                   <button
                     onClick={handleScanLiveTheaters}
                     disabled={isLiveRadarScanning}
                     title="Query multi-source live radar for currently playing box office releases"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition-all cursor-pointer disabled:opacity-50 ml-1 whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-zinc-950 transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shadow-xs"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isLiveRadarScanning ? 'animate-spin' : ''}`} />
                     <span>{isLiveRadarScanning ? 'Scanning...' : 'Sync Theaters'}</span>
                   </button>
+                </div>
+              )}
+
+              {activeCategory === 'movies' && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-300 text-xs font-semibold self-start md:self-auto">
+                  <Film className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Streaming Feature Films Only</span>
+                </div>
+              )}
+
+              {activeCategory === 'series' && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold self-start md:self-auto">
+                  <Tv className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Premier Television & Streaming Series</span>
                 </div>
               )}
             </div>
@@ -788,10 +776,12 @@ export default function App() {
               <div className="p-12 text-center bg-zinc-900/40 rounded-3xl border border-zinc-800 space-y-3">
                 <Search className="w-8 h-8 text-zinc-500 mx-auto" />
                 <h3 className="text-base font-bold text-white">
-                  {activeCategory === 'movies'
-                    ? 'No Movies Found'
+                  {activeCategory === 'now_playing'
+                    ? 'No In Theaters Movies Found'
+                    : activeCategory === 'movies'
+                    ? 'No Streaming Movies Found'
                     : activeCategory === 'series'
-                    ? 'No Series Found'
+                    ? 'No Premier Series Found'
                     : 'No Titles Found'}
                 </h3>
                 <p className="text-xs text-zinc-400 max-w-sm mx-auto">

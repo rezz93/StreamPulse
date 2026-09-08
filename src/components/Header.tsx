@@ -56,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </span>
                 </div>
                 <p className="text-[11px] text-zinc-400 font-medium">
-                  In Theaters, Streaming Movies & Premium Series
+                  In Theaters, Streaming Movies & Premier Series
                 </p>
               </div>
             </div>
