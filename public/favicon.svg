@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="sp-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="50%" stop-color="#4f46e5" />
+      <stop offset="100%" stop-color="#9333ea" />
+    </linearGradient>
+  </defs>
+  <!-- Background with rounded-xl corner and amber ring matching StreamPulse upper-left icon -->
+  <rect x="2" y="2" width="60" height="60" rx="18" fill="url(#sp-gradient)" stroke="#f59e0b" stroke-width="3" stroke-opacity="0.45" />
+  <!-- Lucide Clapperboard Icon in crisp white -->
+  <g transform="translate(16, 16) scale(1.333)" fill="none" stroke="#ffffff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20.2 6 3 11l-.9-2.4c-.4-1.1.2-2.4 1.3-2.8l13.7-4.9c1.1-.4 2.4.2 2.8 1.3Z" />
+    <path d="m6.2 5.3 3.1 3.9" />
+    <path d="m12.4 3.4 3.1 4" />
+    <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+  </g>
+</svg>
