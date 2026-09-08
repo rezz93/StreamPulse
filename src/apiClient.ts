@@ -1,3 +1,4 @@
+import { generateSeasonIntel } from '../shared/seasonIntelService';
 import { searchTvmazeShows } from '../shared/tvmazeService';
 import { searchWikipediaMedia } from '../shared/wikipediaService';
 import { Series } from './types';
@@ -16,9 +17,6 @@ function json(body: unknown, status = 200): Response {
     headers: { 'Content-Type': 'application/json' },
   });
 }
-
-const unavailable = (feature: string) =>
-  json({ error: `${feature} needs the StreamPulse server and is unavailable in the static build.` }, 501);
 
 async function staticSeries(): Promise<Response> {
   const response = await fetch(`${BASE_URL}api/series.json`);
@@ -85,8 +83,57 @@ async function handleStatically(url: URL, _init?: RequestInit): Promise<Response
     }
   }
 
-  if (pathname === '/api/series/ai-season-intel') return unavailable('AI season intelligence');
-  if (pathname === '/api/bingecat/export.json') return unavailable('The Bingecat/Stremio addon');
+  // AI Season Intelligence static resolution
+  if (pathname === '/api/series/ai-season-intel') {
+    let body: any = {};
+    if (_init?.body) {
+      try {
+        body = typeof _init.body === 'string' ? JSON.parse(_init.body) : _init.body;
+      } catch {
+        body = {};
+      }
+    }
+    const title = (body.title || '').trim();
+    const context = body.context || '';
+    const series = body.series as Partial<Series> | undefined;
+
+    // 1. Check pre-baked static season intelligence
+    try {
+      const intelRes = await fetch(`${BASE_URL}api/season-intel.json`);
+      if (intelRes.ok) {
+        const intelMap = await intelRes.json();
+        const found =
+          (series?.id && intelMap[series.id]) ||
+          (title && (intelMap[title.toLowerCase().trim()] || intelMap[title]));
+        if (found) {
+          return json(found);
+        }
+      }
+    } catch {
+      // Continue to on-the-fly generation
+    }
+
+    // 2. Synthesize season intelligence on-the-fly
+    const generated = generateSeasonIntel(title, context, series);
+    return json(generated);
+  }
+
+  // Bingecat watchlist export static resolution
+  if (pathname === '/api/bingecat/export.json') {
+    try {
+      const exportRes = await fetch(`${BASE_URL}api/bingecat/export.json`);
+      if (exportRes.ok) return exportRes;
+    } catch {
+      // Fallback
+    }
+    return json({
+      name: 'StreamPulse Watchlist & Season Premieres',
+      description: 'Synchronized from StreamPulse series tracker',
+      updatedAt: new Date().toISOString(),
+      itemCount: 0,
+      items: [],
+    });
+  }
 
   return json({ error: `No static handler for ${pathname}` }, 501);
 }
@@ -94,10 +141,24 @@ async function handleStatically(url: URL, _init?: RequestInit): Promise<Response
 /**
  * Drop-in replacement for `fetch` against the app's own API. Server builds pass straight
  * through; static builds answer from baked JSON and TVMaze calls.
+ * If server returns 404 or 501, it automatically fails over to the static handler.
  */
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-  if (!IS_STATIC_BUILD) return fetch(path, init);
   const url = new URL(path, window.location.origin);
+
+  if (!IS_STATIC_BUILD) {
+    try {
+      const response = await fetch(path, init);
+      if (response.status === 404 || response.status === 501) {
+        return await handleStatically(url, init);
+      }
+      return response;
+    } catch {
+      // Server down or offline: fail over to static handler
+      return await handleStatically(url, init);
+    }
+  }
+
   try {
     return await handleStatically(url, init);
   } catch (err) {

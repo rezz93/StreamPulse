@@ -3,6 +3,7 @@ import path from 'path';
 import { INITIAL_SERIES_DATABASE, PROVIDERS } from '../server/seriesData';
 import { MOVIES_DATABASE } from '../server/moviesData';
 import { IMDB_MAPPING, getAddonManifest, seriesToMetaItem, seriesToFullMeta } from '../server/bingecatAddon';
+import { generateSeasonIntel } from '../shared/seasonIntelService';
 
 const outDir = process.argv[2] || 'dist/api';
 fs.mkdirSync(outDir, { recursive: true });
@@ -105,3 +106,48 @@ for (const item of combinedSeries) {
   }
 }
 console.log(`Wrote ${metaCount} static metadata JSON endpoints for Nuvio & Stremio`);
+
+// 4. Pre-baked Season Intelligence for Static Builds
+const intelMap: Record<string, any> = {};
+for (const item of combinedSeries) {
+  const intel = generateSeasonIntel(
+    item.title,
+    `Network: ${item.network || item.primaryProvider}, Total Seasons: ${item.totalSeasons}, Current Status: ${item.renewalBadgeText}`,
+    item
+  );
+  intelMap[item.id] = intel;
+  intelMap[item.title.toLowerCase().trim()] = intel;
+}
+const intelPath = path.join(outDir, 'season-intel.json');
+fs.writeFileSync(intelPath, JSON.stringify(intelMap, null, 2), 'utf8');
+console.log(`Wrote season intelligence for ${combinedSeries.length} titles to ${intelPath}`);
+
+// 5. Bingecat Watchlist Export
+const defaultExportSeries = combinedSeries.filter(s =>
+  ['severance', 'the-last-of-us', 'stranger-things', 'shogun', 'the-bear', 'dune-part-two'].includes(s.id)
+);
+const exportData = {
+  name: "StreamPulse Watchlist & Season Premieres",
+  description: "Synchronized from StreamPulse series tracker",
+  updatedAt: new Date().toISOString(),
+  itemCount: defaultExportSeries.length,
+  items: defaultExportSeries.map(s => {
+    const mapping = IMDB_MAPPING[s.id];
+    return {
+      title: s.title,
+      year: s.firstAirYear,
+      imdbId: mapping?.imdbId || null,
+      provider: s.primaryProvider,
+      network: s.network,
+      rating: s.rating,
+      status: s.status,
+      renewalState: s.renewalState,
+      renewalBadgeText: s.renewalBadgeText,
+      nextSeasonReleaseDate: s.nextSeasonReleaseDate || null,
+      genres: s.genres,
+      overview: s.synopsis
+    };
+  })
+};
+writeJson(path.join(outDir, 'bingecat', 'export.json'), exportData);
+console.log(`Wrote static bingecat export to ${path.join(outDir, 'bingecat', 'export.json')}`);

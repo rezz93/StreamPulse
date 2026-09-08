@@ -78,6 +78,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
         body: JSON.stringify({
           title: series.title,
           context: `Network: ${series.network || series.primaryProvider}, Total Seasons: ${series.totalSeasons}, Current Status: ${series.renewalBadgeText}`,
+          series,
         }),
       });
 
@@ -542,7 +543,9 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
           {activeTab === 'cast' && (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div>
-                <h4 className="text-sm font-bold text-white mb-2">Series Synopsis</h4>
+                <h4 className="text-sm font-bold text-white mb-2">
+                  {isMovie ? 'Movie Synopsis' : 'Series Synopsis'}
+                </h4>
                 <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed bg-zinc-950/60 p-4 rounded-xl border border-zinc-800">
                   {series.synopsis}
                 </p>
@@ -555,7 +558,9 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
                     {isMovie ? 'Directed By' : 'Created By'}
                   </span>
                   <span className="text-sm font-bold text-zinc-100 mt-1 block">
-                    {series.creator || (isMovie ? 'Director' : 'Showrunner / Creators')}
+                    {isMovie
+                      ? (series.director || series.creator || 'Director')
+                      : (series.creator || series.director || 'Showrunner / Creators')}
                   </span>
                 </div>
                 <div className="bg-zinc-950/60 border border-zinc-800 p-4 rounded-xl">

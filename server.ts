@@ -258,13 +258,15 @@ async function startServer() {
   // AI Season Intelligence Endpoint (Gemini)
   app.post("/api/series/ai-season-intel", async (req: Request, res: Response) => {
     try {
-      const { title, context } = req.body;
+      const { title, context, series } = req.body;
       if (!title || typeof title !== 'string') {
         res.status(400).json({ error: "Show title is required" });
         return;
       }
 
-      const intel = await fetchAISeasonIntelligence(title, context);
+      // If series was not passed, see if it exists in local database
+      const matchedSeries = series || seriesDatabase.find(s => s.title.toLowerCase() === title.toLowerCase() || s.id === title);
+      const intel = await fetchAISeasonIntelligence(title, context, matchedSeries);
       res.json(intel);
     } catch (error: any) {
       console.error("AI Season Intel route error:", error);

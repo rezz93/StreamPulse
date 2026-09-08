@@ -155,8 +155,8 @@ export const MOVIES_DATABASE: Series[] = [
     "title": "Wicked",
     "tagline": "Everyone deserves the chance to fly.",
     "synopsis": "Elphaba, an ostracized young woman because of her green skin, and Glinda, a popular blonde, meet at Shiz University in the Land of Oz and forge an unlikely friendship before their paths diverge into destiny.",
-    "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/515/1288332.jpg",
-    "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/515/1288332.jpg",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/3/3c/Wicked_%282024_film%29_poster.png",
+    "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/3/3c/Wicked_%282024_film%29_poster.png",
     "providers": [
       "theaters",
       "peacock"
@@ -360,8 +360,8 @@ export const MOVIES_DATABASE: Series[] = [
     "title": "Beetlejuice Beetlejuice",
     "tagline": "The juice is loose.",
     "synopsis": "After an unexpected family tragedy, three generations of the Deetz family return home to Winter River. Still haunted by Beetlejuice, Lydia's life is turned upside down when her rebellious teenage daughter discovers the mysterious portal to the Afterlife.",
-    "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/33/84271.jpg",
-    "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/33/84271.jpg",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/b/ba/Beetlejuice_Beetlejuice_poster.jpg",
+    "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/b/ba/Beetlejuice_Beetlejuice_poster.jpg",
     "providers": [
       "theaters",
       "max"
@@ -489,8 +489,8 @@ export const MOVIES_DATABASE: Series[] = [
     "title": "Past Lives",
     "tagline": "Inyeon: The connection between two people throughout eternity.",
     "synopsis": "Nora and Hae Sung, two deeply connected childhood friends, are wrested apart after Nora's family emigrates from South Korea. Two decades later, they are reunited in New York for one fateful week.",
-    "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/355/888469.jpg",
-    "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/355/888469.jpg",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/d/da/Past_Lives_film_poster.png",
+    "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/d/da/Past_Lives_film_poster.png",
     "providers": [
       "mubi"
     ],
@@ -550,8 +550,8 @@ export const MOVIES_DATABASE: Series[] = [
     "title": "Aftersun",
     "tagline": "Memory is a fragile thing.",
     "synopsis": "Sophie reflects on the shared joy and private melancholy of a holiday she took with her father twenty years earlier. Memories real and imagined fill the gaps between as she tries to reconcile the father she knew with the man she didn't.",
-    "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/444/1111406.jpg",
-    "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/444/1111406.jpg",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/1/11/Aftersun.jpg",
+    "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/1/11/Aftersun.jpg",
     "providers": [
       "mubi"
     ],
@@ -669,8 +669,8 @@ export const MOVIES_DATABASE: Series[] = [
     "title": "Perfect Days",
     "tagline": "Life is made of little moments.",
     "synopsis": "Hirayama seems entirely content with his simple life as a cleaner of toilets in Tokyo. Outside of his very structured everyday routine he enjoys his passion for music and for books.",
-    "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/583/1457516.jpg",
-    "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/583/1457516.jpg",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/c/c9/Perfect_Days_poster.jpg",
+    "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/c/c9/Perfect_Days_poster.jpg",
     "providers": [
       "mubi"
     ],
@@ -793,8 +793,8 @@ export const MOVIES_DATABASE: Series[] = [
     "title": "Priscilla",
     "tagline": "Through her eyes.",
     "synopsis": "When teenage Priscilla Beaulieu meets Elvis Presley at a party in Germany, the man who is already a meteoric rock-and-roll superstar becomes someone entirely unexpected in private moments.",
-    "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/546/1366059.jpg",
-    "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/546/1366059.jpg",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/2/28/Priscilla_poster.jpeg",
+    "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/2/28/Priscilla_poster.jpeg",
     "providers": [
       "mubi",
       "max"
@@ -1043,8 +1043,8 @@ export const MOVIES_DATABASE: Series[] = [
     "title": "Wolfs",
     "tagline": "Two lone wolves. One very long night.",
     "synopsis": "Two rival fixers cross paths when they're both called to help cover up a prominent New York official's misstep, escalating an already volatile night.",
-    "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/23/58374.jpg",
-    "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/23/58374.jpg",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/4/48/Wolfs_%28film%29.jpg",
+    "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/4/48/Wolfs_%28film%29.jpg",
     "providers": [
       "appletv"
     ],
@@ -1167,8 +1167,8 @@ export const MOVIES_DATABASE: Series[] = [
     "title": "Road House",
     "tagline": "Rule #1: Never underestimate a bouncer.",
     "synopsis": "An ex-UFC middleweight fighter takes a job at a rough-and-tumble roadhouse in the Florida Keys, but discovers that paradise is not all it seems.",
-    "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/42/106034.jpg",
-    "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/42/106034.jpg",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/3/37/Road_House_2024_poster.jpg",
+    "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/3/37/Road_House_2024_poster.jpg",
     "providers": [
       "prime"
     ],
@@ -1227,8 +1227,8 @@ export const MOVIES_DATABASE: Series[] = [
     "title": "Oppenheimer",
     "tagline": "The world forever changes.",
     "synopsis": "The story of American scientist J. Robert Oppenheimer and his role in the development of the atomic bomb during World War II.",
-    "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/280/700901.jpg",
-    "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/280/700901.jpg",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/4/4a/Oppenheimer_%28film%29.jpg",
+    "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/4/4a/Oppenheimer_%28film%29.jpg",
     "providers": [
       "peacock",
       "prime"
@@ -1294,8 +1294,8 @@ export const MOVIES_DATABASE: Series[] = [
     "title": "The Dark Knight",
     "tagline": "Why so serious?",
     "synopsis": "When the menace known as the Joker wreaks havoc and chaos on the people of Gotham, Batman must accept one of the greatest psychological and physical tests of his ability to fight injustice.",
-    "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/529/1324476.jpg",
-    "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/529/1324476.jpg",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/1/1c/The_Dark_Knight_%282008_film%29.jpg",
+    "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/1/1c/The_Dark_Knight_%282008_film%29.jpg",
     "providers": [
       "max"
     ],
@@ -1415,8 +1415,8 @@ export const MOVIES_DATABASE: Series[] = [
     "title": "The Godfather",
     "tagline": "An offer you can't refuse.",
     "synopsis": "The aging patriarch of an organized crime dynasty transfers control of his clandestine empire to his reluctant youngest son.",
-    "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/275/688576.jpg",
-    "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/275/688576.jpg",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/1/1c/Godfather_ver1.jpg",
+    "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/1/1c/Godfather_ver1.jpg",
     "providers": [
       "paramount"
     ],
@@ -1594,8 +1594,8 @@ export const MOVIES_DATABASE: Series[] = [
     "title": "Blade Runner",
     "tagline": "Man has made his match... now it's his problem.",
     "synopsis": "A blade runner must pursue and terminate four replicants who stole a ship in space and have returned to Earth to find their creator.",
-    "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/633/1584394.jpg",
-    "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/633/1584394.jpg",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/9/9f/Blade_Runner_%281982_poster%29.png",
+    "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/9/9f/Blade_Runner_%281982_poster%29.png",
     "providers": [
       "max",
       "prime"
@@ -1655,8 +1655,8 @@ export const MOVIES_DATABASE: Series[] = [
     "title": "Back to the Future",
     "tagline": "He's the only kid ever to get into trouble before he was born.",
     "synopsis": "Marty McFly, a 17-year-old high school student, is accidentally sent thirty years into the past in a time-traveling DeLorean invented by his close friend, the eccentric scientist Doc Brown.",
-    "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/298/746829.jpg",
-    "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/298/746829.jpg",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/d/d2/Back_to_the_Future.jpg",
+    "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/d/d2/Back_to_the_Future.jpg",
     "providers": [
       "peacock",
       "netflix"
@@ -1716,8 +1716,8 @@ export const MOVIES_DATABASE: Series[] = [
     "title": "Superman",
     "tagline": "Look up in the sky.",
     "synopsis": "Superman reconciles his heritage with his human upbringing, symbolizing truth, justice, and the American way in a world that views kindness as old-fashioned.",
-    "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/26/66186.jpg",
-    "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/26/66186.jpg",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/3/32/Superman_%282025_film%29_poster.jpg",
+    "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/3/32/Superman_%282025_film%29_poster.jpg",
     "providers": [
       "theaters",
       "max"
