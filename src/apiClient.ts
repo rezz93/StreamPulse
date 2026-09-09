@@ -32,6 +32,25 @@ async function handleStatically(url: URL, _init?: RequestInit): Promise<Response
   if (pathname === '/api/series') return staticSeries();
   if (pathname === '/api/watchlist/sync') return json({ success: true, static: true });
 
+  if (pathname === '/api/theaters/live-radar') {
+    try {
+      const catRes = await fetch(`${BASE_URL}api/series.json`);
+      if (catRes.ok) {
+        const catData = (await catRes.json()) as { series: Series[] };
+        const theaters = (catData.series || []).filter(
+          (s) =>
+            s.mediaType === 'movie' &&
+            (s.theaterStatus === 'now_in_theaters' ||
+              (s.providers.includes('theaters') && s.theaterStatus !== 'coming_to_theaters' && !s.isUpcoming))
+        );
+        return json({ total: theaters.length, titles: theaters, source: 'static_catalog' });
+      }
+    } catch {
+      // Fallback
+    }
+    return json({ total: 0, titles: [], source: 'fallback' });
+  }
+
   if (pathname === '/api/series/live-search') {
     const query = searchParams.get('q') ?? '';
     if (!query.trim()) return json({ results: [], source: 'none' });

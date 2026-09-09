@@ -96,12 +96,13 @@ export async function fetchLiveTheatersRadar(): Promise<Partial<Series>[]> {
   if (!ai) return [];
 
   try {
-    const prompt = `Provide the top 6 movies currently playing in movie theaters right now.
+    const prompt = `Provide the top 6 to 8 movies currently playing in movie theaters right now (current box office theatrical releases, such as Spider-Man: Brand New Day, Toy Story 5, Superman, Jurassic World Rebirth, A Minecraft Movie, Avatar: Fire and Ash, Mission: Impossible – The Final Reckoning, F1, Lilo & Stitch, Tron: Ares, Karate Kid: Legends, Coyote vs. Acme, Demon Slayer: Infinity Castle, The Dog Stars).
+Do NOT return movies from 2024 or earlier that have finished their theatrical runs and moved to home streaming (such as Dune: Part Two, Deadpool & Wolverine, Beetlejuice Beetlejuice, or Alien: Romulus).
 For each movie include:
 - title
 - tagline
 - synopsis (concise 2-sentence overview)
-- releaseYear (e.g. 2024, 2025, or 2026)
+- releaseYear (e.g. 2025 or 2026)
 - runtimeMinutes
 - director
 - genres (array of strings, e.g. ["Action", "Sci-Fi"])
@@ -170,7 +171,7 @@ For each movie include:
       rating: item.rating || 8.1,
       ratingCount: 'Live Cinema Radar',
       contentRating: 'PG-13',
-      firstAirYear: item.releaseYear || 2024,
+      firstAirYear: item.releaseYear || new Date().getFullYear(),
       decade: '2020s',
       totalSeasons: 1,
       totalEpisodes: 1,
