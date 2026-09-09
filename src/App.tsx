@@ -242,16 +242,21 @@ export default function App() {
   const categoryCounts = useMemo(() => {
     const shows = seriesList.filter((s) => s.mediaType !== 'movie');
     const allMovies = seriesList.filter((s) => s.mediaType === 'movie');
+    const currentYear = new Date().getFullYear();
     const theaters = allMovies.filter(
       (s) =>
-        s.theaterStatus === 'now_in_theaters' ||
-        (s.providers.includes('theaters') && s.theaterStatus !== 'coming_to_theaters' && !s.isUpcoming)
+        s.firstAirYear === currentYear &&
+        s.isDomestic !== false &&
+        (s.theaterStatus === 'now_in_theaters' ||
+          (s.providers.includes('theaters') && s.theaterStatus !== 'coming_to_theaters' && !s.isUpcoming))
     );
     const streamingMovies = allMovies.filter(
       (s) =>
-        s.theaterStatus !== 'now_in_theaters' &&
-        s.theaterStatus !== 'coming_to_theaters' &&
-        !s.isUpcoming
+        (s.theaterStatus !== 'now_in_theaters' &&
+          s.theaterStatus !== 'coming_to_theaters' &&
+          !s.isUpcoming) ||
+        s.firstAirYear !== currentYear ||
+        s.isDomestic === false
     );
     const upcoming = seriesList.filter(
       (s) =>
@@ -280,21 +285,27 @@ export default function App() {
 
     // Category Filter: Strict taxonomy separation
     if (activeCategory === 'now_playing') {
-      // IN THEATERS: ONLY movies currently playing in cinema theaters
+      // IN THEATERS: ONLY domestic movies released in the current year currently playing in theaters
+      const currentYear = new Date().getFullYear();
       list = list.filter(
         (s) =>
           s.mediaType === 'movie' &&
+          s.firstAirYear === currentYear &&
+          s.isDomestic !== false &&
           (s.theaterStatus === 'now_in_theaters' ||
             (s.providers.includes('theaters') && s.theaterStatus !== 'coming_to_theaters' && !s.isUpcoming))
       );
     } else if (activeCategory === 'movies') {
       // STREAMING MOVIES: ONLY feature films on streaming platforms
+      const currentYear = new Date().getFullYear();
       list = list.filter(
         (s) =>
           s.mediaType === 'movie' &&
-          s.theaterStatus !== 'now_in_theaters' &&
-          s.theaterStatus !== 'coming_to_theaters' &&
-          !s.isUpcoming
+          ((s.theaterStatus !== 'now_in_theaters' &&
+            s.theaterStatus !== 'coming_to_theaters' &&
+            !s.isUpcoming) ||
+            s.firstAirYear !== currentYear ||
+            s.isDomestic === false)
       );
     } else if (activeCategory === 'series') {
       // PREMIER SERIES: ONLY television and streaming series
@@ -313,14 +324,24 @@ export default function App() {
           ['season_upcoming', 'renewed', 'in_production', 'final_season_upcoming'].includes(s.renewalState)
       );
     } else if (activeCategory === 'classics') {
-      list = list.filter((s) => s.isClassic || s.status === 'Ended' || s.firstAirYear < 2020);
+      list = list.filter((s) => s.isClassic || s.decade === 'Pre-70s' || s.status === 'Ended' || s.firstAirYear < 2020);
     } else if (activeCategory === 'watchlist') {
       list = list.filter((s) => watchlist.includes(s.id));
     }
 
     // Provider Filter
     if (selectedProvider !== 'all') {
-      list = list.filter((s) => s.providers.includes(selectedProvider));
+      if (selectedProvider === 'theaters') {
+        const currentYear = new Date().getFullYear();
+        list = list.filter(
+          (s) =>
+            s.providers.includes('theaters') &&
+            s.firstAirYear === currentYear &&
+            s.isDomestic !== false
+        );
+      } else {
+        list = list.filter((s) => s.providers.includes(selectedProvider));
+      }
     }
 
     // Provider Curation Shelf Filter: New on Provider, Your Next Watch, Currently Airing

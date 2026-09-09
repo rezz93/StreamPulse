@@ -37,9 +37,12 @@ async function handleStatically(url: URL, _init?: RequestInit): Promise<Response
       const catRes = await fetch(`${BASE_URL}api/series.json`);
       if (catRes.ok) {
         const catData = (await catRes.json()) as { series: Series[] };
+        const currentYear = new Date().getFullYear();
         const theaters = (catData.series || []).filter(
           (s) =>
             s.mediaType === 'movie' &&
+            s.firstAirYear === currentYear &&
+            s.isDomestic !== false &&
             (s.theaterStatus === 'now_in_theaters' ||
               (s.providers.includes('theaters') && s.theaterStatus !== 'coming_to_theaters' && !s.isUpcoming))
         );
@@ -66,7 +69,10 @@ async function handleStatically(url: URL, _init?: RequestInit): Promise<Response
               s.title.toLowerCase().includes(qLower) ||
               s.synopsis.toLowerCase().includes(qLower) ||
               (s.director && s.director.toLowerCase().includes(qLower)) ||
-              s.genres.some((g) => g.toLowerCase().includes(qLower))
+              (s.creator && s.creator.toLowerCase().includes(qLower)) ||
+              s.genres.some((g) => g.toLowerCase().includes(qLower)) ||
+              (s.cast && s.cast.some((c) => c.name.toLowerCase().includes(qLower) || (c.role && c.role.toLowerCase().includes(qLower)))) ||
+              (s.renewalBadgeText && s.renewalBadgeText.toLowerCase().includes(qLower))
           );
         }
       } catch {

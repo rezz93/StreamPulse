@@ -176,7 +176,10 @@ async function startServer() {
             s.title.toLowerCase().includes(qLower) ||
             s.synopsis.toLowerCase().includes(qLower) ||
             (s.director && s.director.toLowerCase().includes(qLower)) ||
-            s.genres.some(g => g.toLowerCase().includes(qLower))
+            (s.creator && s.creator.toLowerCase().includes(qLower)) ||
+            s.genres.some(g => g.toLowerCase().includes(qLower)) ||
+            (s.cast && s.cast.some(c => c.name.toLowerCase().includes(qLower) || (c.role && c.role.toLowerCase().includes(qLower)))) ||
+            (s.renewalBadgeText && s.renewalBadgeText.toLowerCase().includes(qLower))
         )
         .map(s => ({ ...s, source: s.source || ('catalog' as const) }));
 

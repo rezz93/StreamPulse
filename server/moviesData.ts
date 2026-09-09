@@ -1,8 +1,10 @@
 import { Series } from '../src/types';
+import { CLASSIC_MOVIES_DATABASE } from './classicMoviesData';
 
-export const MOVIES_DATABASE: Series[] = [
+const CORE_MOVIES: Series[] = [
   {
   "id": "spider-man-brand-new-day",
+  "isDomestic": true,
   "imdbId": "tt113244935",
   "mediaType": "movie",
   "title": "Spider-Man: Brand New Day",
@@ -70,6 +72,7 @@ export const MOVIES_DATABASE: Series[] = [
 },
   {
   "id": "toy-story-5",
+  "isDomestic": true,
   "imdbId": "tt113641997",
   "mediaType": "movie",
   "title": "Toy Story 5",
@@ -161,7 +164,7 @@ export const MOVIES_DATABASE: Series[] = [
   "totalSeasons": 1,
   "totalEpisodes": 1,
   "runtimeMinutes": 142,
-  "theaterStatus": "now_in_theaters",
+  "theaterStatus": "past_theatrical",
   "boxOffice": "$616.8M Worldwide",
   "director": "James Gunn",
   "creator": "Jerry Siegel, Joe Shuster & James Gunn",
@@ -231,7 +234,7 @@ export const MOVIES_DATABASE: Series[] = [
   "totalSeasons": 1,
   "totalEpisodes": 1,
   "runtimeMinutes": 134,
-  "theaterStatus": "now_in_theaters",
+  "theaterStatus": "past_theatrical",
   "boxOffice": "$872M Worldwide",
   "director": "Gareth Edwards",
   "creator": "David Koepp & Michael Crichton",
@@ -301,7 +304,7 @@ export const MOVIES_DATABASE: Series[] = [
   "totalSeasons": 1,
   "totalEpisodes": 1,
   "runtimeMinutes": 112,
-  "theaterStatus": "now_in_theaters",
+  "theaterStatus": "past_theatrical",
   "boxOffice": "$962M Worldwide",
   "director": "Jared Hess",
   "creator": "Mojang Studios & Jared Hess",
@@ -371,7 +374,7 @@ export const MOVIES_DATABASE: Series[] = [
   "totalSeasons": 1,
   "totalEpisodes": 1,
   "runtimeMinutes": 192,
-  "theaterStatus": "now_in_theaters",
+  "theaterStatus": "past_theatrical",
   "boxOffice": "$765M Worldwide",
   "director": "James Cameron",
   "creator": "James Cameron, Rick Jaffa, Amanda Silver",
@@ -441,7 +444,7 @@ export const MOVIES_DATABASE: Series[] = [
   "totalSeasons": 1,
   "totalEpisodes": 1,
   "runtimeMinutes": 168,
-  "theaterStatus": "now_in_theaters",
+  "theaterStatus": "past_theatrical",
   "boxOffice": "$590M Worldwide",
   "director": "Christopher McQuarrie",
   "creator": "Christopher McQuarrie & Erik Jendresen",
@@ -511,7 +514,7 @@ export const MOVIES_DATABASE: Series[] = [
   "totalSeasons": 1,
   "totalEpisodes": 1,
   "runtimeMinutes": 108,
-  "theaterStatus": "now_in_theaters",
+  "theaterStatus": "past_theatrical",
   "boxOffice": "$1.03B Worldwide",
   "director": "Dean Fleischer Camp",
   "creator": "Chris Sanders & Dean DeBlois",
@@ -581,7 +584,7 @@ export const MOVIES_DATABASE: Series[] = [
   "totalSeasons": 1,
   "totalEpisodes": 1,
   "runtimeMinutes": 145,
-  "theaterStatus": "now_in_theaters",
+  "theaterStatus": "past_theatrical",
   "boxOffice": "$450M Worldwide",
   "director": "Joseph Kosinski",
   "creator": "Ehren Kruger & Joseph Kosinski",
@@ -651,7 +654,7 @@ export const MOVIES_DATABASE: Series[] = [
   "totalSeasons": 1,
   "totalEpisodes": 1,
   "runtimeMinutes": 125,
-  "theaterStatus": "now_in_theaters",
+  "theaterStatus": "past_theatrical",
   "boxOffice": "$380M Worldwide",
   "director": "Joachim Rønning",
   "creator": "Jesse Wigutow & Jack Thorne",
@@ -721,7 +724,7 @@ export const MOVIES_DATABASE: Series[] = [
   "totalSeasons": 1,
   "totalEpisodes": 1,
   "runtimeMinutes": 118,
-  "theaterStatus": "now_in_theaters",
+  "theaterStatus": "past_theatrical",
   "boxOffice": "$220M Worldwide",
   "director": "Jonathan Entwistle",
   "creator": "Rob Lieber",
@@ -762,6 +765,7 @@ export const MOVIES_DATABASE: Series[] = [
 },
   {
   "id": "coyote-vs-acme",
+  "isDomestic": true,
   "imdbId": "tt106392679",
   "mediaType": "movie",
   "title": "Coyote vs. Acme",
@@ -829,6 +833,7 @@ export const MOVIES_DATABASE: Series[] = [
   {
   "id": "demon-slayer-infinity-castle",
   "imdbId": "tt32876612",
+  "isDomestic": false,
   "mediaType": "movie",
   "title": "Demon Slayer: Kimetsu no Yaiba – Infinity Castle",
   "tagline": "The final battle begins.",
@@ -853,7 +858,7 @@ export const MOVIES_DATABASE: Series[] = [
   "totalSeasons": 1,
   "totalEpisodes": 1,
   "runtimeMinutes": 135,
-  "theaterStatus": "now_in_theaters",
+  "theaterStatus": "past_theatrical",
   "boxOffice": "$715M Worldwide",
   "director": "Haruo Sotozaki",
   "creator": "Koyoharu Gotouge & Ufotable",
@@ -894,6 +899,7 @@ export const MOVIES_DATABASE: Series[] = [
 },
   {
   "id": "the-dog-stars",
+  "isDomestic": true,
   "imdbId": "tt3391852",
   "mediaType": "movie",
   "title": "The Dog Stars",
@@ -945,6 +951,204 @@ export const MOVIES_DATABASE: Series[] = [
       "title": "Theatrical Release",
       "episodeCount": 1,
       "releaseDate": "2026-08-28",
+      "status": "released"
+    }
+  ]
+},
+{
+  "id": "michael-2026",
+  "imdbId": "tt113244901",
+  "mediaType": "movie",
+  "title": "Michael",
+  "tagline": "The King of Pop.",
+  "synopsis": "The definitive biographical drama recounting the triumphs, creative brilliance, and complex struggles of Michael Jackson.",
+  "posterUrl": "https://upload.wikimedia.org/wikipedia/en/3/30/Michael_%282025_film%29_poster.jpg",
+  "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/3/30/Michael_%282025_film%29_poster.jpg",
+  "providers": ["theaters"],
+  "primaryProvider": "theaters",
+  "genres": ["Biography", "Drama", "Music"],
+  "rating": 8.5,
+  "ratingCount": "110K+",
+  "contentRating": "PG-13",
+  "firstAirYear": 2026,
+  "decade": "2020s",
+  "totalSeasons": 1,
+  "totalEpisodes": 1,
+  "runtimeMinutes": 155,
+  "theaterStatus": "now_in_theaters",
+  "isDomestic": true,
+  "boxOffice": "$340M Domestic Box Office",
+  "director": "Antoine Fuqua",
+  "network": "Lionsgate / Universal",
+  "status": "In Theaters",
+  "isNowPlaying": true,
+  "isUpcoming": false,
+  "isClassic": false,
+  "hasNewSeasonAlert": false,
+  "isNewOnProvider": true,
+  "isCurrentlyAiring": true,
+  "renewalState": "airing_now",
+  "renewalBadgeText": "Now Playing in Theaters",
+  "renewalNewsSummary": "Leading the domestic box office with sensational musical recreations.",
+  "cast": [
+    { "name": "Jaafar Jackson", "role": "Michael Jackson" },
+    { "name": "Colman Domingo", "role": "Joe Jackson" },
+    { "name": "Nia Long", "role": "Katherine Jackson" }
+  ],
+  "seasons": [
+    {
+      "seasonNumber": 1,
+      "title": "Theatrical Release",
+      "episodeCount": 1,
+      "releaseDate": "2026-04-18",
+      "status": "released"
+    }
+  ]
+},
+{
+  "id": "the-batman-part-ii",
+  "imdbId": "tt1877830",
+  "mediaType": "movie",
+  "title": "The Batman Part II",
+  "tagline": "The shadows deepen in Gotham.",
+  "synopsis": "Bruce Wayne delves further into the corrupt institutional darkness gripping Gotham City while confronting an elusive and psychological new threat.",
+  "posterUrl": "https://upload.wikimedia.org/wikipedia/en/f/ff/The_Batman_%28film%29_poster.jpg",
+  "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/f/ff/The_Batman_%28film%29_poster.jpg",
+  "providers": ["theaters"],
+  "primaryProvider": "theaters",
+  "genres": ["Action", "Crime", "Drama", "Mystery"],
+  "rating": 8.9,
+  "ratingCount": "240K+",
+  "contentRating": "PG-13",
+  "firstAirYear": 2026,
+  "decade": "2020s",
+  "totalSeasons": 1,
+  "totalEpisodes": 1,
+  "runtimeMinutes": 165,
+  "theaterStatus": "now_in_theaters",
+  "isDomestic": true,
+  "boxOffice": "$485M Domestic / $920M Worldwide",
+  "director": "Matt Reeves",
+  "network": "Warner Bros. Pictures / DC Studios",
+  "status": "In Theaters",
+  "isNowPlaying": true,
+  "isUpcoming": false,
+  "isClassic": false,
+  "hasNewSeasonAlert": false,
+  "isNewOnProvider": true,
+  "isCurrentlyAiring": true,
+  "renewalState": "airing_now",
+  "renewalBadgeText": "Now Playing in IMAX Theaters",
+  "renewalNewsSummary": "Matt Reeves delivers a breathtaking sequel capturing the top domestic box office spot.",
+  "cast": [
+    { "name": "Robert Pattinson", "role": "Bruce Wayne / Batman" },
+    { "name": "Colin Farrell", "role": "Oz Cobb / The Penguin" },
+    { "name": "Jeffrey Wright", "role": "Jim Gordon" }
+  ],
+  "seasons": [
+    {
+      "seasonNumber": 1,
+      "title": "Theatrical Release",
+      "episodeCount": 1,
+      "releaseDate": "2026-10-02",
+      "status": "released"
+    }
+  ]
+},
+{
+  "id": "weapons-2026",
+  "imdbId": "tt26443598",
+  "mediaType": "movie",
+  "title": "Weapons",
+  "tagline": "Everything is connected.",
+  "synopsis": "An interrelated, multi-story horror mystery chronicling the disappearance of high school students in a small Florida town.",
+  "posterUrl": "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&auto=format&fit=crop&q=80",
+  "backdropUrl": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1600&auto=format&fit=crop&q=80",
+  "providers": ["theaters"],
+  "primaryProvider": "theaters",
+  "genres": ["Horror", "Mystery", "Thriller"],
+  "rating": 8.1,
+  "ratingCount": "65K+",
+  "contentRating": "R",
+  "firstAirYear": 2026,
+  "decade": "2020s",
+  "totalSeasons": 1,
+  "totalEpisodes": 1,
+  "runtimeMinutes": 128,
+  "theaterStatus": "now_in_theaters",
+  "isDomestic": true,
+  "boxOffice": "$140M Domestic Box Office",
+  "director": "Zach Cregger",
+  "network": "New Line Cinema / Warner Bros.",
+  "status": "In Theaters",
+  "isNowPlaying": true,
+  "isUpcoming": false,
+  "isClassic": false,
+  "hasNewSeasonAlert": false,
+  "isNewOnProvider": true,
+  "isCurrentlyAiring": true,
+  "renewalState": "airing_now",
+  "renewalBadgeText": "Now Playing in Theaters",
+  "renewalNewsSummary": "Zach Cregger follows up Barbarian with another critically lauded psychological masterstroke.",
+  "cast": [
+    { "name": "Josh Brolin", "role": "Sheriff Archer" },
+    { "name": "Julia Garner", role: "Elena" }
+  ],
+  "seasons": [
+    {
+      "seasonNumber": 1,
+      "title": "Theatrical Release",
+      "episodeCount": 1,
+      "releaseDate": "2026-01-16",
+      "status": "released"
+    }
+  ]
+},
+{
+  "id": "project-hail-mary",
+  "imdbId": "tt12042730",
+  "mediaType": "movie",
+  "title": "Project Hail Mary",
+  "tagline": "An astronaut on a solo mission to save humanity from extinction.",
+  "synopsis": "Ryland Grace is the sole survivor on a desperate, last-chance mission—and if he fails, humanity and the Earth itself will perish.",
+  "posterUrl": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&auto=format&fit=crop&q=80",
+  "backdropUrl": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1600&auto=format&fit=crop&q=80",
+  "providers": ["theaters"],
+  "primaryProvider": "theaters",
+  "genres": ["Sci-Fi", "Adventure", "Drama"],
+  "rating": 8.7,
+  "ratingCount": "150K+",
+  "contentRating": "PG-13",
+  "firstAirYear": 2026,
+  "decade": "2020s",
+  "totalSeasons": 1,
+  "totalEpisodes": 1,
+  "runtimeMinutes": 145,
+  "theaterStatus": "now_in_theaters",
+  "isDomestic": true,
+  "boxOffice": "$310M Domestic Box Office",
+  "director": "Phil Lord & Christopher Miller",
+  "network": "Amazon MGM Studios / Theatrical",
+  "status": "In Theaters",
+  "isNowPlaying": true,
+  "isUpcoming": false,
+  "isClassic": false,
+  "hasNewSeasonAlert": false,
+  "isNewOnProvider": true,
+  "isCurrentlyAiring": true,
+  "renewalState": "airing_now",
+  "renewalBadgeText": "Now Playing in IMAX Theaters",
+  "renewalNewsSummary": "A critical triumph adapting Andy Weir's beloved interstellar novel.",
+  "cast": [
+    { "name": "Ryan Gosling", "role": "Ryland Grace" },
+    { "name": "Sandra Hüller", "role": "Eva Stratt" }
+  ],
+  "seasons": [
+    {
+      "seasonNumber": 1,
+      "title": "Theatrical Release",
+      "episodeCount": 1,
+      "releaseDate": "2026-03-20",
       "status": "released"
     }
   ]
@@ -1033,9 +1237,9 @@ export const MOVIES_DATABASE: Series[] = [
   "posterUrl": "https://upload.wikimedia.org/wikipedia/en/4/4c/Deadpool_%26_Wolverine_poster.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail_unscaled",
   "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/4/4c/Deadpool_%26_Wolverine_poster.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail_unscaled",
   "providers": [
-    "disney"
+    "hulu"
   ],
-  "primaryProvider": "disney",
+  "primaryProvider": "hulu",
   "genres": [
     "Action",
     "Comedy",
@@ -2640,8 +2844,7 @@ export const MOVIES_DATABASE: Series[] = [
   "posterUrl": "https://upload.wikimedia.org/wikipedia/en/e/ee/Avengers_Doomsday_poster.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail_unscaled",
   "backdropUrl": "https://upload.wikimedia.org/wikipedia/en/e/ee/Avengers_Doomsday_poster.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail_unscaled",
   "providers": [
-    "theaters",
-    "disney"
+    "theaters"
   ],
   "primaryProvider": "theaters",
   "genres": [
@@ -2952,3 +3155,6 @@ export const MOVIES_DATABASE: Series[] = [
   ]
 }
 ];
+
+export const MOVIES_DATABASE: Series[] = [...CORE_MOVIES, ...CLASSIC_MOVIES_DATABASE];
+

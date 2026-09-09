@@ -9,7 +9,7 @@ function providerForNetwork(networkName: string): StreamingProviderId {
   if (netLower.includes('apple')) return 'appletv';
   if (netLower.includes('hbo') || netLower.includes('max')) return 'max';
   if (netLower.includes('amazon') || netLower.includes('prime')) return 'prime';
-  if (netLower.includes('disney')) return 'disney';
+  if (netLower.includes('disney')) return 'hulu';
   if (netLower.includes('hulu')) return 'hulu';
   if (netLower.includes('paramount') || netLower.includes('cbs') || netLower.includes('showtime')) return 'paramount';
   if (netLower.includes('peacock') || netLower.includes('nbc')) return 'peacock';

@@ -57,7 +57,7 @@ function guessProvider(title: string, desc: string): StreamingProviderId {
   if (text.includes('apple tv') || text.includes('apple original')) return 'appletv';
   if (text.includes('hbo') || text.includes('max') || text.includes('warner')) return 'max';
   if (text.includes('prime video') || text.includes('amazon')) return 'prime';
-  if (text.includes('disney') || text.includes('marvel') || text.includes('star wars') || text.includes('pixar')) return 'disney';
+  if (text.includes('disney') || text.includes('marvel') || text.includes('star wars') || text.includes('pixar')) return 'hulu';
   if (text.includes('paramount') || text.includes('cbs') || text.includes('showtime')) return 'paramount';
   if (text.includes('peacock') || text.includes('nbc')) return 'peacock';
   if (text.includes('hulu')) return 'hulu';
@@ -97,15 +97,73 @@ export async function searchWikipediaMedia(query: string): Promise<Series[]> {
     const hits = searchData.query?.search || [];
     if (hits.length === 0) return [];
 
-    // Filter to media titles: exclude lists, discographies, soundtracks, accolades, characters, etc.
-    const filteredHits = hits.filter((h) => {
+    // Check if any hit points to an actor/filmmaker filmography page
+    const filmographyHit = hits.find(
+      (h) => h.title.toLowerCase().includes('filmography') || h.title.toLowerCase().includes('videography')
+    );
+    let filmographyMovieTitles: string[] = [];
+    if (filmographyHit) {
+      try {
+        const parseUrl = `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(
+          filmographyHit.title
+        )}&prop=links&format=json&origin=*`;
+        const parseRes = await fetch(parseUrl, { headers: { 'User-Agent': USER_AGENT } });
+        if (parseRes.ok) {
+          const parseData = (await parseRes.json()) as { parse?: { links?: Array<{ '*': string }> } };
+          const links = parseData.parse?.links || [];
+          filmographyMovieTitles = links
+            .map((l) => l['*'])
+            .filter(
+              (name) =>
+                name &&
+                (name.includes('(film)') || name.includes('(19') || name.includes('(20')) &&
+                !name.toLowerCase().includes('critic') &&
+                !name.toLowerCase().includes('award') &&
+                !name.toLowerCase().includes('festival') &&
+                !name.toLowerCase().includes('list of')
+            )
+            .slice(0, 6);
+        }
+      } catch {
+        // Continue with standard search
+      }
+    }
+
+    // Also perform a secondary search with " film" appended if search is an actor or subject name
+    let secondaryFilmHits: Array<{ title: string; snippet: string }> = [];
+    if (
+      !cleanQ.toLowerCase().includes('film') &&
+      !cleanQ.toLowerCase().includes('movie') &&
+      !cleanQ.toLowerCase().includes('series')
+    ) {
+      try {
+        const filmSearchUrl = `${WIKI_SEARCH_API}?action=query&list=search&srsearch=${encodeURIComponent(
+          cleanQ + ' film'
+        )}&srlimit=6&format=json&origin=*`;
+        const filmSearchRes = await fetch(filmSearchUrl, { headers: { 'User-Agent': USER_AGENT } });
+        if (filmSearchRes.ok) {
+          const filmSearchData = (await filmSearchRes.json()) as {
+            query?: { search?: Array<{ title: string; snippet: string }> };
+          };
+          secondaryFilmHits = filmSearchData.query?.search || [];
+        }
+      } catch {
+        // Continue with primary search
+      }
+    }
+
+    // Filter to media titles: exclude lists, filmographies, discographies, soundtracks, accolades, characters, etc.
+    const allCandidateHits = [...hits, ...secondaryFilmHits];
+    const filteredHits = allCandidateHits.filter((h) => {
       const t = h.title.toLowerCase();
       const s = h.snippet.toLowerCase();
       if (
         t.startsWith('list of') ||
+        t.includes('filmography') ||
+        t.includes('videography') ||
+        t.includes('discography') ||
         t.includes('characters in') ||
         t.includes('character') ||
-        t.includes('discography') ||
         t.includes('soundtrack') ||
         t.includes('awards') ||
         t.includes('accolades') ||
@@ -130,17 +188,28 @@ export async function searchWikipediaMedia(query: string): Promise<Series[]> {
       );
     });
 
-    // Take top candidates and fetch their summaries in parallel
-    const topHits = filteredHits.slice(0, 4);
-    const summaryPromises = topHits.map(async (hit) => {
+    // Combine candidate titles from filmography and hits, deduplicating
+    const candidateTitleSet = new Set<string>();
+    for (const title of filmographyMovieTitles) {
+      candidateTitleSet.add(title);
+    }
+    for (const hit of filteredHits) {
+      candidateTitleSet.add(hit.title);
+    }
+
+    const candidateTitles = Array.from(candidateTitleSet).slice(0, 6);
+    if (candidateTitles.length === 0) return [];
+
+    // Fetch summaries in parallel
+    const summaryPromises = candidateTitles.map(async (title) => {
       try {
-        const sumUrl = `${WIKI_SUMMARY_API}/${encodeURIComponent(hit.title)}`;
+        const sumUrl = `${WIKI_SUMMARY_API}/${encodeURIComponent(title)}`;
         const sumRes = await fetch(sumUrl, {
           headers: { 'User-Agent': USER_AGENT },
         });
         if (!sumRes.ok) return null;
         const sumData = await sumRes.json();
-        return { hit, sumData };
+        return { title, sumData };
       } catch {
         return null;
       }
@@ -193,6 +262,16 @@ export async function searchWikipediaMedia(query: string): Promise<Series[]> {
 
       if (!isFilm && !isTv) {
         continue;
+      }
+
+      // If search triggered an actor filmography, ensure this title genuinely features or mentions the actor
+      if (filmographyHit && !cleanQ.toLowerCase().includes('film') && !cleanQ.toLowerCase().includes('movie')) {
+        const queryTerms = cleanQ.toLowerCase().split(/\s+/).filter(Boolean);
+        const textToSearch = `${titleLower} ${descLower} ${extract.toLowerCase()}`;
+        const mentionsActor = queryTerms.every((term) => textToSearch.includes(term));
+        if (!mentionsActor) {
+          continue;
+        }
       }
 
       const mediaType: 'tv' | 'movie' = isTv && !isFilm ? 'tv' : 'movie';

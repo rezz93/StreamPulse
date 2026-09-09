@@ -14,7 +14,6 @@ const PROVIDER_METAS: Record<StreamingProviderId, { name: string; bg: string; te
   appletv: { name: 'Apple TV+', bg: 'bg-zinc-900', text: 'text-zinc-100', border: 'border-zinc-700' },
   max: { name: 'Max (HBO)', bg: 'bg-[#002BE7]', text: 'text-white', border: 'border-blue-500/40' },
   prime: { name: 'Prime Video', bg: 'bg-[#00A8E1]', text: 'text-white', border: 'border-sky-400/40' },
-  disney: { name: 'Disney+', bg: 'bg-[#113CCF]', text: 'text-white', border: 'border-blue-400/40' },
   mubi: { name: 'MUBI', bg: 'bg-[#001489]', text: 'text-white', border: 'border-blue-400/40' },
   hulu: { name: 'Hulu', bg: 'bg-[#1CE783]', text: 'text-zinc-950', border: 'border-emerald-500/40' },
   paramount: { name: 'Paramount+', bg: 'bg-[#0064FF]', text: 'text-white', border: 'border-indigo-400/40' },

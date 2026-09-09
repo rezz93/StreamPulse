@@ -51,7 +51,10 @@ export const Header: React.FC<HeaderProps> = ({
                   <h1 className="text-lg sm:text-xl font-black tracking-tight text-white">
                     StreamPulse
                   </h1>
-                  <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-[10px] font-extrabold text-amber-300 border border-amber-500/30">
+                  <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-[10px] font-mono font-bold text-zinc-300 border border-zinc-700">
+                    v1.0.0
+                  </span>
+                  <span className="hidden sm:inline-block px-1.5 py-0.2 rounded bg-amber-500/20 text-[10px] font-extrabold text-amber-300 border border-amber-500/30">
                     CINEMA & STREAMING RADAR
                   </span>
                 </div>

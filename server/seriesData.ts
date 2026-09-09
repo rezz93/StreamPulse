@@ -56,15 +56,6 @@ export const PROVIDERS: StreamingProvider[] = [
     "accentColor": "#00A8E1"
   },
   {
-    "id": "disney",
-    "name": "Disney+",
-    "badgeColor": "bg-cyan-600/20 text-cyan-400 border-cyan-500/30",
-    "bgColor": "bg-[#113CCF]",
-    "textColor": "text-white",
-    "iconName": "Zap",
-    "accentColor": "#113CCF"
-  },
-  {
     "id": "mubi",
     "name": "MUBI",
     "badgeColor": "bg-blue-900/30 text-sky-300 border-blue-500/40",
@@ -1485,9 +1476,9 @@ export const INITIAL_SERIES_DATABASE: Series[] = [
     "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/564/1411766.jpg",
     "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/564/1411766.jpg",
     "providers": [
-      "disney"
+      "hulu"
     ],
-    "primaryProvider": "disney",
+    "primaryProvider": "hulu",
     "genres": [
       "Sci-Fi",
       "Political Thriller",
@@ -1503,7 +1494,7 @@ export const INITIAL_SERIES_DATABASE: Series[] = [
     "totalEpisodes": 24,
     "runtimeMinutes": 48,
     "creator": "Tony Gilroy",
-    "network": "Lucasfilm / Disney+",
+    "network": "Lucasfilm / Hulu",
     "status": "Returning Series",
     "isNowPlaying": false,
     "isUpcoming": true,
@@ -1558,9 +1549,9 @@ export const INITIAL_SERIES_DATABASE: Series[] = [
     "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/536/1340567.jpg",
     "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/536/1340567.jpg",
     "providers": [
-      "disney"
+      "hulu"
     ],
-    "primaryProvider": "disney",
+    "primaryProvider": "hulu",
     "genres": [
       "Dark Fantasy",
       "Comedy",
@@ -1576,7 +1567,7 @@ export const INITIAL_SERIES_DATABASE: Series[] = [
     "totalEpisodes": 9,
     "runtimeMinutes": 42,
     "creator": "Jac Schaeffer",
-    "network": "Marvel Studios / Disney+",
+    "network": "Marvel Studios / Hulu",
     "status": "Ended",
     "isNowPlaying": true,
     "isUpcoming": false,
@@ -1585,8 +1576,8 @@ export const INITIAL_SERIES_DATABASE: Series[] = [
     "isNewOnProvider": true,
     "isCurrentlyAiring": true,
     "renewalState": "concluded",
-    "renewalBadgeText": "New on Disney+",
-    "renewalNewsSummary": "Acclaimed follow-up to WandaVision, dominating Disney+ streaming charts.",
+    "renewalBadgeText": "New on Hulu",
+    "renewalNewsSummary": "Acclaimed follow-up to WandaVision, dominating streaming charts.",
     "cast": [
       {
         "name": "Kathryn Hahn",
@@ -1620,9 +1611,9 @@ export const INITIAL_SERIES_DATABASE: Series[] = [
     "posterUrl": "https://static.tvmaze.com/uploads/images/original_untouched/501/1253498.jpg",
     "backdropUrl": "https://static.tvmaze.com/uploads/images/original_untouched/501/1253498.jpg",
     "providers": [
-      "disney"
+      "prime"
     ],
-    "primaryProvider": "disney",
+    "primaryProvider": "prime",
     "genres": [
       "Sci-Fi",
       "Space Western",
@@ -1637,7 +1628,7 @@ export const INITIAL_SERIES_DATABASE: Series[] = [
     "totalEpisodes": 24,
     "runtimeMinutes": 40,
     "creator": "Jon Favreau",
-    "network": "Lucasfilm / Disney+",
+    "network": "Lucasfilm / Prime Video",
     "status": "Returning Series",
     "isNowPlaying": false,
     "isUpcoming": false,
@@ -1645,7 +1636,7 @@ export const INITIAL_SERIES_DATABASE: Series[] = [
     "hasNewSeasonAlert": true,
     "isNextWatch": true,
     "renewalState": "in_production",
-    "renewalBadgeText": "Your Next Watch on Disney+",
+    "renewalBadgeText": "Your Next Watch on Prime Video",
     "renewalNewsSummary": "Next chapter expands into the feature film The Mandalorian & Grogu directed by Jon Favreau.",
     "cast": [
       {

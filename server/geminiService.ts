@@ -96,17 +96,18 @@ export async function fetchLiveTheatersRadar(): Promise<Partial<Series>[]> {
   if (!ai) return [];
 
   try {
-    const prompt = `Provide the top 6 to 8 movies currently playing in movie theaters right now (current box office theatrical releases, such as Spider-Man: Brand New Day, Toy Story 5, Superman, Jurassic World Rebirth, A Minecraft Movie, Avatar: Fire and Ash, Mission: Impossible – The Final Reckoning, F1, Lilo & Stitch, Tron: Ares, Karate Kid: Legends, Coyote vs. Acme, Demon Slayer: Infinity Castle, The Dog Stars).
-Do NOT return movies from 2024 or earlier that have finished their theatrical runs and moved to home streaming (such as Dune: Part Two, Deadpool & Wolverine, Beetlejuice Beetlejuice, or Alien: Romulus).
+    const currentYear = new Date().getFullYear();
+    const prompt = `Provide the top 6 to 8 domestic movies currently playing in domestic movie theaters in the current year (${currentYear}) only (such as Spider-Man: Brand New Day, Toy Story 5, Coyote vs. Acme, The Dog Stars, Michael, The Batman Part II, Weapons, Project Hail Mary).
+Do NOT return movies from previous years (${currentYear - 1} or earlier) or foreign/international-only releases. Return ONLY domestic releases from ${currentYear}.
 For each movie include:
 - title
 - tagline
 - synopsis (concise 2-sentence overview)
-- releaseYear (e.g. 2025 or 2026)
+- releaseYear (must be ${currentYear})
 - runtimeMinutes
 - director
 - genres (array of strings, e.g. ["Action", "Sci-Fi"])
-- boxOffice (e.g. "$650M Worldwide" or current gross)
+- boxOffice (e.g. "$340M Domestic Box Office")
 - rating (e.g. 8.4)
 - theaterStatus: "now_in_theaters"`;
 
@@ -171,12 +172,13 @@ For each movie include:
       rating: item.rating || 8.1,
       ratingCount: 'Live Cinema Radar',
       contentRating: 'PG-13',
-      firstAirYear: item.releaseYear || new Date().getFullYear(),
+      firstAirYear: item.releaseYear || currentYear,
       decade: '2020s',
       totalSeasons: 1,
       totalEpisodes: 1,
       runtimeMinutes: item.runtimeMinutes || 120,
       theaterStatus: 'now_in_theaters',
+      isDomestic: true,
       boxOffice: item.boxOffice || 'Box Office Active',
       director: item.director,
       status: 'In Theaters',

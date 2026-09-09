@@ -5,7 +5,6 @@ export type StreamingProviderId =
   | 'appletv'
   | 'max'
   | 'prime'
-  | 'disney'
   | 'mubi'
   | 'hulu'
   | 'paramount'
@@ -84,6 +83,7 @@ export interface Series {
   runtimeMinutes?: number;
   theaterStatus?: 'now_in_theaters' | 'coming_to_theaters' | 'past_theatrical';
   boxOffice?: string;
+  isDomestic?: boolean;
   director?: string;
   status: 'Returning Series' | 'Ended' | 'Upcoming Series' | 'In Production' | 'Released' | 'In Theaters' | 'Upcoming';
   

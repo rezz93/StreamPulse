@@ -21,16 +21,17 @@ export const ClassicsExplorerView: React.FC<ClassicsExplorerViewProps> = ({
 
   const decades: Array<{ id: string; label: string; sub: string }> = [
     { id: 'all', label: 'All Decades', sub: 'Complete Archive' },
-    { id: '2010s', label: '2010s Era', sub: 'Peak TV Era' },
+    { id: '2010s', label: '2010s Era', sub: 'Peak TV & Modern Epics' },
     { id: '2000s', label: '2000s Era', sub: 'Golden Age Drama' },
     { id: '90s', label: '1990s', sub: 'Cult & Prestigious' },
     { id: '80s', label: '1980s', sub: 'Sci-Fi & Pioneers' },
-    { id: '70s', label: 'Vintage / 70s', sub: 'Classic Foundations' },
+    { id: '70s', label: '1970s', sub: 'New Hollywood Masters' },
+    { id: 'Pre-70s', label: 'Pre-70s / Vintage', sub: 'Golden Era Foundations' },
   ];
 
   const decadeFiltered = selectedDecade === 'all'
     ? series
-    : series.filter((s) => s.decade === selectedDecade);
+    : series.filter((s) => s.decade?.toLowerCase() === selectedDecade.toLowerCase());
   const mediaKindOptions = [
     { id: 'all' as const, label: 'All', count: decadeFiltered.length },
     { id: 'series' as const, label: 'Series', count: decadeFiltered.filter((s) => s.mediaType !== 'movie').length },
