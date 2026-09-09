@@ -721,13 +721,18 @@ export default function App() {
                     <span>In Theaters Only</span>
                   </div>
                   <button
+                    id="live-theater-radar-btn"
                     onClick={handleScanLiveTheaters}
                     disabled={isLiveRadarScanning}
-                    title="Query multi-source live radar for currently playing box office releases"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-zinc-950 transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shadow-xs"
+                    title="Scan live box office & cinema radar feeds for currently playing releases"
+                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-zinc-950 transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap shadow-md shadow-amber-500/20"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isLiveRadarScanning ? 'animate-spin' : ''}`} />
-                    <span>{isLiveRadarScanning ? 'Scanning...' : 'Sync Theaters'}</span>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-zinc-950 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-zinc-950"></span>
+                    </span>
+                    <Radio className={`w-3.5 h-3.5 ${isLiveRadarScanning ? 'animate-spin' : ''}`} />
+                    <span>{isLiveRadarScanning ? 'Scanning Radar...' : 'Live Cinema Radar'}</span>
                   </button>
                 </div>
               )}
