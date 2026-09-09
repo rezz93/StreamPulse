@@ -1,5 +1,6 @@
 import { Series } from '../src/types';
 import { CLASSIC_MOVIES_DATABASE } from './classicMoviesData';
+import { DOMESTIC_THEATRICAL_2026_MOVIES } from './theatricalMovies2026';
 
 const CORE_MOVIES: Series[] = [
   {
@@ -3156,5 +3157,9 @@ const CORE_MOVIES: Series[] = [
 }
 ];
 
-export const MOVIES_DATABASE: Series[] = [...CORE_MOVIES, ...CLASSIC_MOVIES_DATABASE];
+export const MOVIES_DATABASE: Series[] = [
+  ...CORE_MOVIES,
+  ...CLASSIC_MOVIES_DATABASE,
+  ...DOMESTIC_THEATRICAL_2026_MOVIES
+];
 

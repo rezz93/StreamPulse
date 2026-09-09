@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Series } from '../types';
-import { Bookmark, Film, Search, X, Loader2, Tv, Sparkles, Star, Clapperboard, Clock, Globe, Database, Radio } from 'lucide-react';
+import { Bookmark, Film, Search, X, Loader2, Tv, Sparkles, Star, Clapperboard, Clock, Globe, Database, Radio, CheckCircle2 } from 'lucide-react';
 import { liveSearchTitles } from '../apiClient';
 import { ProviderBadge } from './ProviderBadge';
 
@@ -10,6 +10,7 @@ interface GlobalSearchModalProps {
   onSelectSeries: (series: Series) => void;
   onToggleWatchlist: (series: Series) => void;
   watchlistIds: string[];
+  initialQuery?: string;
 }
 
 const POPULAR_QUICK_SEARCHES = [
@@ -32,31 +33,47 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
   onSelectSeries,
   onToggleWatchlist,
   watchlistIds,
+  initialQuery = '',
 }) => {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<Series[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'theaters' | 'movies' | 'series'>('all');
   const [sourceFilter, setSourceFilter] = useState<'all' | 'wikipedia' | 'tvmaze' | 'catalog'>('all');
 
-  if (!isOpen) return null;
-
-  const runSearch = async (searchQuery: string) => {
-    if (!searchQuery.trim()) return;
+  const runSearch = useCallback(async (searchQuery: string) => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) return;
 
     setIsLoading(true);
     setHasSearched(true);
     try {
-      const { results: found } = await liveSearchTitles(searchQuery);
+      const { results: found } = await liveSearchTitles(trimmed);
       setResults(found);
     } catch (err) {
-      console.error(err);
+      console.error('Live search error:', err);
       setResults([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  // Synchronize search term from main screen when modal opens or initialQuery changes
+  useEffect(() => {
+    if (isOpen) {
+      const term = (initialQuery || '').trim();
+      setQuery(initialQuery || '');
+      if (term) {
+        void runSearch(term);
+      } else {
+        setResults([]);
+        setHasSearched(false);
+      }
+    }
+  }, [isOpen, initialQuery, runSearch]);
+
+  if (!isOpen) return null;
 
   const handleQuickSearch = (term: string) => {
     setQuery(term);
@@ -133,16 +150,32 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search any movie, theatrical release, or TV show (e.g. Dune, Casablanca, Severance)..."
-            className="w-full bg-zinc-950 border border-zinc-700 text-zinc-100 placeholder-zinc-500 rounded-xl pl-9.5 pr-24 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500/50"
+            className="w-full bg-zinc-950 border border-zinc-700 text-zinc-100 placeholder-zinc-500 rounded-xl pl-9.5 pr-28 py-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500/50"
             autoFocus
           />
-          <button
-            type="submit"
-            disabled={isLoading || !query.trim()}
-            className="absolute right-2 top-1/2 -translate-y-1/2 px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 text-zinc-950 font-bold text-xs transition-all cursor-pointer disabled:cursor-not-allowed"
-          >
-            {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Search'}
-          </button>
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+            {query && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('');
+                  setResults([]);
+                  setHasSearched(false);
+                }}
+                className="p-1 text-zinc-400 hover:text-zinc-200 text-xs"
+                title="Clear input"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button
+              type="submit"
+              disabled={isLoading || !query.trim()}
+              className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 text-zinc-950 font-bold text-xs transition-all cursor-pointer disabled:cursor-not-allowed"
+            >
+              {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Search'}
+            </button>
+          </div>
         </form>
 
         {/* Multi-source live badges */}
@@ -226,6 +259,20 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 <option value="catalog">Curated Catalog</option>
               </select>
             </div>
+          </div>
+        )}
+
+        {/* Results summary and no-limits indicator */}
+        {hasSearched && !isLoading && (
+          <div className="flex items-center justify-between text-xs text-zinc-400 px-1 pt-1 flex-wrap gap-2">
+            <span className="font-medium text-zinc-300">
+              Found <strong className="text-amber-400 font-bold">{filteredResults.length}</strong> {filteredResults.length === 1 ? 'title' : 'titles'}
+              {query.trim() ? <> for "<span className="text-white font-semibold">{query}</span>"</> : null}
+            </span>
+            <span className="text-[11px] text-zinc-400 flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              Showing all matches across sources (no arbitrary limit)
+            </span>
           </div>
         )}
 

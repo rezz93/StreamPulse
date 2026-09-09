@@ -813,12 +813,23 @@ export default function App() {
                 <p className="text-xs text-zinc-400 max-w-sm mx-auto">
                   No titles match your current filter combination. Try clearing filters or searching for another title.
                 </p>
-                <button
-                  onClick={clearFilters}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all cursor-pointer"
-                >
-                  Clear All Filters
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                  <button
+                    onClick={clearFilters}
+                    className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold text-xs transition-all cursor-pointer"
+                  >
+                    Clear All Filters
+                  </button>
+                  {searchQuery.trim() && (
+                    <button
+                      onClick={() => setIsGlobalSearchOpen(true)}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs transition-all cursor-pointer shadow-md shadow-amber-500/20"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Search "{searchQuery}" across All Sources</span>
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -851,6 +862,7 @@ export default function App() {
       <GlobalSearchModal
         isOpen={isGlobalSearchOpen}
         onClose={() => setIsGlobalSearchOpen(false)}
+        initialQuery={searchQuery}
         onSelectSeries={(series) => {
           setSelectedSeries(series);
           setIsDetailModalOpen(true);

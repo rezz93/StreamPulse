@@ -97,7 +97,7 @@ export async function fetchLiveTheatersRadar(): Promise<Partial<Series>[]> {
 
   try {
     const currentYear = new Date().getFullYear();
-    const prompt = `Provide the top 6 to 8 domestic movies currently playing in domestic movie theaters in the current year (${currentYear}) only (such as Spider-Man: Brand New Day, Toy Story 5, Coyote vs. Acme, The Dog Stars, Michael, The Batman Part II, Weapons, Project Hail Mary).
+    const prompt = `Provide all active domestic movies currently playing in domestic US movie theaters in the current year (${currentYear}). Include all active wide and platform domestic theatrical releases (up to 30 titles), strictly domestic US cinema releases from ${currentYear}.
 Do NOT return movies from previous years (${currentYear - 1} or earlier) or foreign/international-only releases. Return ONLY domestic releases from ${currentYear}.
 For each movie include:
 - title

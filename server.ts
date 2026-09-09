@@ -230,8 +230,14 @@ async function startServer() {
   // Live Cinema & In-Theaters Discovery feed (Curated Box Office + Gemini Live Radar)
   app.get("/api/theaters/live-radar", async (_req: Request, res: Response) => {
     try {
+      const currentYear = new Date().getFullYear();
       const localTheaters = seriesDatabase.filter(
-        s => s.theaterStatus === 'now_in_theaters' || s.providers.includes('theaters')
+        s =>
+          s.mediaType === 'movie' &&
+          s.firstAirYear === currentYear &&
+          s.isDomestic !== false &&
+          (s.theaterStatus === 'now_in_theaters' ||
+            (s.providers.includes('theaters') && s.theaterStatus !== 'coming_to_theaters' && !s.isUpcoming))
       );
 
       // Attempt AI live radar for latest theater box office additions
@@ -241,7 +247,11 @@ async function startServer() {
 
       for (const item of aiTheaters as Series[]) {
         const norm = item.title.toLowerCase().trim();
-        if (!seenTitles.has(norm)) {
+        if (
+          !seenTitles.has(norm) &&
+          item.firstAirYear === currentYear &&
+          item.isDomestic !== false
+        ) {
           combined.push(item);
           seenTitles.add(norm);
         }

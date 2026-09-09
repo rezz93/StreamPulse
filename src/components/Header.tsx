@@ -52,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
                     StreamPulse
                   </h1>
                   <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-[10px] font-mono font-bold text-zinc-300 border border-zinc-700">
-                    v1.0.0
+                    v1.0.1
                   </span>
                   <span className="hidden sm:inline-block px-1.5 py-0.2 rounded bg-amber-500/20 text-[10px] font-extrabold text-amber-300 border border-amber-500/30">
                     CINEMA & STREAMING RADAR
@@ -114,6 +114,11 @@ export const Header: React.FC<HeaderProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && searchQuery.trim()) {
+                    onOpenLiveSearch();
+                  }
+                }}
                 placeholder="Search movies, series, directors, cast..."
                 className="w-full bg-zinc-900/90 border border-zinc-800 text-zinc-200 placeholder-zinc-500 rounded-xl pl-9.5 pr-4 py-2 text-xs sm:text-sm focus:outline-hidden focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500 transition-all"
               />

@@ -82,7 +82,7 @@ export async function searchWikipediaMedia(query: string): Promise<Series[]> {
     // 1. Search Wikipedia for pages matching the title
     const searchUrl = `${WIKI_SEARCH_API}?action=query&list=search&srsearch=${encodeURIComponent(
       cleanQ
-    )}&srlimit=8&format=json&origin=*`;
+    )}&srlimit=20&format=json&origin=*`;
 
     const searchRes = await fetch(searchUrl, {
       headers: { 'User-Agent': USER_AGENT },
@@ -122,7 +122,7 @@ export async function searchWikipediaMedia(query: string): Promise<Series[]> {
                 !name.toLowerCase().includes('festival') &&
                 !name.toLowerCase().includes('list of')
             )
-            .slice(0, 6);
+            .slice(0, 20);
         }
       } catch {
         // Continue with standard search
@@ -139,7 +139,7 @@ export async function searchWikipediaMedia(query: string): Promise<Series[]> {
       try {
         const filmSearchUrl = `${WIKI_SEARCH_API}?action=query&list=search&srsearch=${encodeURIComponent(
           cleanQ + ' film'
-        )}&srlimit=6&format=json&origin=*`;
+        )}&srlimit=15&format=json&origin=*`;
         const filmSearchRes = await fetch(filmSearchUrl, { headers: { 'User-Agent': USER_AGENT } });
         if (filmSearchRes.ok) {
           const filmSearchData = (await filmSearchRes.json()) as {
@@ -197,7 +197,7 @@ export async function searchWikipediaMedia(query: string): Promise<Series[]> {
       candidateTitleSet.add(hit.title);
     }
 
-    const candidateTitles = Array.from(candidateTitleSet).slice(0, 6);
+    const candidateTitles = Array.from(candidateTitleSet).slice(0, 25);
     if (candidateTitles.length === 0) return [];
 
     // Fetch summaries in parallel
