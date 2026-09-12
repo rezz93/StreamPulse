@@ -30,7 +30,22 @@ async function handleStatically(url: URL, _init?: RequestInit): Promise<Response
 
   if (pathname === '/api/providers') return fetch(`${BASE_URL}api/providers.json`);
   if (pathname === '/api/series') return staticSeries();
-  if (pathname === '/api/watchlist/sync') return json({ success: true, static: true });
+  if (pathname === '/api/watchlist/sync') {
+    if (_init?.method === 'POST') {
+      try {
+        const body = typeof _init.body === 'string' ? JSON.parse(_init.body) : _init.body;
+        if (body?.watchlist && Array.isArray(body.watchlist)) {
+          localStorage.setItem('streampulse_watchlist', JSON.stringify(body.watchlist));
+          localStorage.setItem('streampulse_watchlist_synced_at', new Date().toISOString());
+        }
+        return json({ success: true, count: body?.watchlist?.length || 0, staticMode: true });
+      } catch {
+        return json({ success: true, staticMode: true });
+      }
+    }
+    const saved = localStorage.getItem('streampulse_watchlist');
+    return json({ watchlist: saved ? JSON.parse(saved) : [] });
+  }
 
   if (pathname === '/api/theaters/live-radar') {
     try {
@@ -199,3 +214,54 @@ export async function liveSearchTitles(
   const data = await res.json().catch(() => ({}));
   return { results: data.results || [], source: data.source || 'tvmaze' };
 }
+
+/** Resolves the active sync backend URL */
+export function getBackendSyncUrl(): string {
+  if (typeof window === 'undefined') return '';
+  const custom = localStorage.getItem('streampulse_custom_backend_url');
+  if (custom && custom.trim()) return custom.trim().replace(/\/$/, '');
+
+  // If running on GitHub Pages, use default public backend
+  if (window.location.hostname.includes('github.io')) {
+    return 'https://ais-pre-kmnoqak2kyw6nfgbp7y62g-116799203877.us-east1.run.app';
+  }
+  return window.location.origin;
+}
+
+/** Syncs the user's watchlist with server backend for Stremio addon catalogs */
+export async function syncWatchlistToServer(
+  watchlist: string[],
+  customSeries: Series[] = []
+): Promise<{ success: boolean; count: number; error?: string }> {
+  try {
+    localStorage.setItem('streampulse_watchlist', JSON.stringify(watchlist));
+    localStorage.setItem('streampulse_watchlist_synced_at', new Date().toISOString());
+
+    const backendUrl = getBackendSyncUrl();
+    const endpoint = `${backendUrl}/api/watchlist/sync`;
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ watchlist, customSeries }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return { success: true, count: data.count || watchlist.length };
+    } else {
+      // Fallback through apiFetch
+      await apiFetch('/api/watchlist/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ watchlist, customSeries }),
+      });
+      return { success: true, count: watchlist.length };
+    }
+  } catch (err: any) {
+    console.warn('Watchlist sync error:', err);
+    // Still ensure local storage is updated
+    return { success: true, count: watchlist.length, error: err?.message };
+  }
+}
+

@@ -8,7 +8,9 @@ export type StreamingProviderId =
   | 'mubi'
   | 'hulu'
   | 'paramount'
-  | 'peacock';
+  | 'peacock'
+  | 'disney'
+  | 'disney_plus';
 
 export interface StreamingProvider {
   id: StreamingProviderId;

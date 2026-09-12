@@ -18,6 +18,8 @@ const PROVIDER_METAS: Record<StreamingProviderId, { name: string; bg: string; te
   hulu: { name: 'Hulu', bg: 'bg-[#1CE783]', text: 'text-zinc-950', border: 'border-emerald-500/40' },
   paramount: { name: 'Paramount+', bg: 'bg-[#0064FF]', text: 'text-white', border: 'border-indigo-400/40' },
   peacock: { name: 'Peacock', bg: 'bg-zinc-950', text: 'text-amber-400', border: 'border-amber-500/40' },
+  disney: { name: 'Disney+', bg: 'bg-[#113CCF]', text: 'text-white', border: 'border-blue-500/40' },
+  disney_plus: { name: 'Disney+', bg: 'bg-[#113CCF]', text: 'text-white', border: 'border-blue-500/40' },
 };
 
 export const ProviderBadge: React.FC<ProviderBadgeProps> = ({ providerId, size = 'sm', showLabel = true }) => {

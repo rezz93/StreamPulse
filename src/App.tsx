@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { apiFetch } from './apiClient';
+import { apiFetch, syncWatchlistToServer } from './apiClient';
+import { sanitizeSeriesSeasonIntel } from '../shared/dateSanitizer';
 import {
   Series,
   StreamingProvider,
@@ -7,7 +8,7 @@ import {
   SeriesCategory,
 } from './types';
 import { Header } from './components/Header';
-import { ProviderFilter } from './components/ProviderFilter';
+import { ProviderFilter, MediaTypeFilter } from './components/ProviderFilter';
 import { CategoryTabs } from './components/CategoryTabs';
 import { SeriesCard } from './components/SeriesCard';
 import { SeriesDetailModal } from './components/SeriesDetailModal';
@@ -42,6 +43,7 @@ export default function App() {
   // Filter & Navigation states
   const [activeCategory, setActiveCategory] = useState<SeriesCategory>('now_playing');
   const [selectedProvider, setSelectedProvider] = useState<StreamingProviderId>('all');
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<MediaTypeFilter>('all');
   const [providerShelfFilter, setProviderShelfFilter] = useState<'all' | 'new' | 'next_watch' | 'airing'>('all');
   const [selectedGenre, setSelectedGenre] = useState<string>('All Genres');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -80,13 +82,11 @@ export default function App() {
   useEffect(() => {
     try {
       localStorage.setItem('streampulse_watchlist', JSON.stringify(watchlist));
-      // Sync with server backend for Stremio addon catalog
+      // Sync with server backend for Stremio addon catalog (movies & series)
       const customSeries = seriesList.filter((s) => watchlist.includes(s.id));
-      apiFetch('/api/watchlist/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ watchlist, customSeries }),
-      }).catch((e) => console.log('Watchlist sync error', e));
+      syncWatchlistToServer(watchlist, customSeries).catch((e) =>
+        console.log('Watchlist sync error', e)
+      );
     } catch (e) {
       console.error(e);
     }
@@ -109,8 +109,9 @@ export default function App() {
         const seenIds = new Set<string>();
         const seenTitles = new Set<string>();
         const deduped: Series[] = [];
-        for (const s of (seriesData.series || [])) {
-          if (!s || !s.id || seenIds.has(s.id)) continue;
+        for (const raw of (seriesData.series || [])) {
+          if (!raw || !raw.id || seenIds.has(raw.id)) continue;
+          const s = sanitizeSeriesSeasonIntel(raw);
           const key = `${s.title.toLowerCase().trim()}-${s.mediaType || 'series'}`;
           if (seenTitles.has(key)) continue;
           seenIds.add(s.id);
@@ -401,6 +402,13 @@ export default function App() {
       list = list.filter((s) => watchlist.includes(s.id));
     }
 
+    // Top-row Media Type Filter (All, Movies, Series)
+    if (mediaTypeFilter === 'movies') {
+      list = list.filter((s) => s.mediaType === 'movie');
+    } else if (mediaTypeFilter === 'series') {
+      list = list.filter((s) => s.mediaType !== 'movie');
+    }
+
     // Provider Filter
     if (selectedProvider !== 'all') {
       if (selectedProvider === 'theaters') {
@@ -525,14 +533,17 @@ export default function App() {
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
               <Tv className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Filter by Streaming Network</span>
+              <span>Filter by Network & Media</span>
             </span>
-            {selectedProvider !== 'all' && (
+            {(selectedProvider !== 'all' || mediaTypeFilter !== 'all') && (
               <button
-                onClick={() => setSelectedProvider('all')}
+                onClick={() => {
+                  setSelectedProvider('all');
+                  setMediaTypeFilter('all');
+                }}
                 className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer"
               >
-                Reset to All
+                Reset Filters
               </button>
             )}
           </div>
@@ -541,6 +552,27 @@ export default function App() {
             selectedProvider={selectedProvider}
             onSelectProvider={setSelectedProvider}
             countsByProvider={countsByProvider}
+            mediaTypeFilter={mediaTypeFilter}
+            onSelectMediaType={setMediaTypeFilter}
+            mediaCounts={{
+              all: activeCategory === 'watchlist' ? watchlist.length : categoryCounts.total,
+              theaters:
+                activeCategory === 'watchlist'
+                  ? seriesList.filter(
+                      (s) =>
+                        watchlist.includes(s.id) &&
+                        (s.theaterStatus === 'now_in_theaters' || s.providers.includes('theaters'))
+                    ).length
+                  : categoryCounts.theaters,
+              movies:
+                activeCategory === 'watchlist'
+                  ? seriesList.filter((s) => watchlist.includes(s.id) && s.mediaType === 'movie').length
+                  : seriesList.filter((s) => s.mediaType === 'movie').length,
+              series:
+                activeCategory === 'watchlist'
+                  ? seriesList.filter((s) => watchlist.includes(s.id) && s.mediaType !== 'movie').length
+                  : categoryCounts.series,
+            }}
           />
         </div>
 
@@ -968,6 +1000,7 @@ export default function App() {
       <NuvioStremioModal
         isOpen={isNuvioModalOpen}
         onClose={() => setIsNuvioModalOpen(false)}
+        watchlist={watchlist}
         watchlistSeries={seriesList.filter((s) => watchlist.includes(s.id))}
       />
     </div>

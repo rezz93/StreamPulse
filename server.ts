@@ -8,6 +8,7 @@ import { fetchAISeasonIntelligence, fetchLiveTheatersRadar } from "./server/gemi
 import { getAddonManifest, seriesToMetaItem, seriesToFullMeta, IMDB_MAPPING } from "./server/bingecatAddon";
 import { searchTvmazeShows } from "./shared/tvmazeService";
 import { searchWikipediaMedia } from "./shared/wikipediaService";
+import { sanitizeSeriesCatalog, sanitizeSeriesSeasonIntel } from "./shared/dateSanitizer";
 import { Series, StreamingProviderId } from "./src/types";
 
 function deduplicateSeriesCatalog(items: Series[]): Series[] {
@@ -26,7 +27,7 @@ function deduplicateSeriesCatalog(items: Series[]): Series[] {
   return result;
 }
 
-let seriesDatabase: Series[] = deduplicateSeriesCatalog([
+let seriesDatabase: Series[] = deduplicateSeriesCatalog(sanitizeSeriesCatalog([
   ...INITIAL_SERIES_DATABASE.map(s => {
     const mapping = IMDB_MAPPING[s.id];
     return {
@@ -35,7 +36,7 @@ let seriesDatabase: Series[] = deduplicateSeriesCatalog([
     };
   }),
   ...MOVIES_DATABASE
-]);
+]));
 let currentServerWatchlist: string[] = ['severance', 'the-last-of-us', 'stranger-things', 'the-bear', 'house-of-the-dragon', 'shogun'];
 
 async function startServer() {
@@ -320,10 +321,13 @@ async function startServer() {
         new Set(watchlist.filter((id): id is string => typeof id === "string" && !!id.trim()))
       );
 
+      console.log(`[Watchlist Sync] Updated currentServerWatchlist with ${currentServerWatchlist.length} titles`);
+
       // If custom/searched series were passed, upsert into seriesDatabase so Stremio can catalog them
       if (Array.isArray(customSeries)) {
-        for (const item of customSeries) {
-          if (item && item.id) {
+        for (const rawItem of customSeries) {
+          if (rawItem && rawItem.id) {
+            const item = sanitizeSeriesSeasonIntel(rawItem);
             const existingIdx = seriesDatabase.findIndex(
               (s) =>
                 s.id === item.id ||
@@ -381,14 +385,19 @@ async function startServer() {
     res.setHeader('Access-Control-Allow-Headers', '*');
     const host = req.get('host') || 'localhost:3000';
     const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
-    const baseUrl = `${protocol}://${host}`;
+    const config = req.params.config ? `/${encodeURIComponent(req.params.config)}` : '';
+    const baseUrl = `${protocol}://${host}${config}`;
     res.json(getAddonManifest(baseUrl));
   };
 
-  app.get("/bingecat/manifest.json", handleManifest);
-  app.get("/stremio/manifest.json", handleManifest);
-  app.get("/addon/manifest.json", handleManifest);
-  app.get("/manifest.json", handleManifest);
+  app.get([
+    "/bingecat/manifest.json",
+    "/stremio/manifest.json",
+    "/addon/manifest.json",
+    "/manifest.json",
+    "/:config/manifest.json",
+    "/stremio/:config/manifest.json"
+  ], handleManifest);
 
   // 2. Addon Catalog Endpoint
   const handleCatalog = (req: Request, res: Response) => {
@@ -397,12 +406,17 @@ async function startServer() {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    const { catalogId, type } = req.params;
+    const { catalogId, type, config } = req.params;
     const queryWatchlist = req.query.watchlist as string;
     
     let activeWatchlist = currentServerWatchlist;
-    if (queryWatchlist) {
-      activeWatchlist = queryWatchlist.split(',').map(s => s.trim());
+    if (config) {
+      if (config.startsWith('w=') || config.startsWith('w:')) {
+        const raw = config.slice(2);
+        activeWatchlist = decodeURIComponent(raw).split(',').map(s => s.trim()).filter(Boolean);
+      }
+    } else if (queryWatchlist) {
+      activeWatchlist = queryWatchlist.split(',').map(s => s.trim()).filter(Boolean);
     }
 
     let items: Series[] = [];
@@ -443,9 +457,18 @@ async function startServer() {
     res.json({ metas });
   };
 
-  app.get(["/catalog/:type/:catalogId.json", "/catalog/:type/:catalogId/:extra.json"], handleCatalog);
-  app.get(["/stremio/catalog/:type/:catalogId.json", "/stremio/catalog/:type/:catalogId/:extra.json"], handleCatalog);
-  app.get(["/bingecat/catalog/:type/:catalogId.json", "/bingecat/catalog/:type/:catalogId/:extra.json"], handleCatalog);
+  app.get([
+    "/catalog/:type/:catalogId.json",
+    "/catalog/:type/:catalogId/:extra.json",
+    "/:config/catalog/:type/:catalogId.json",
+    "/:config/catalog/:type/:catalogId/:extra.json",
+    "/stremio/catalog/:type/:catalogId.json",
+    "/stremio/catalog/:type/:catalogId/:extra.json",
+    "/stremio/:config/catalog/:type/:catalogId.json",
+    "/stremio/:config/catalog/:type/:catalogId/:extra.json",
+    "/bingecat/catalog/:type/:catalogId.json",
+    "/bingecat/catalog/:type/:catalogId/:extra.json"
+  ], handleCatalog);
 
   // 3. Addon Meta Endpoint
   const handleMeta = (req: Request, res: Response) => {
