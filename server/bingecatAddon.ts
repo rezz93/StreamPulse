@@ -62,7 +62,12 @@ export function getAddonManifest(baseUrl: string) {
       {
         type: 'series',
         id: 'streampulse_watchlist',
-        name: 'StreamPulse: My Watchlist'
+        name: 'StreamPulse: Series Watchlist'
+      },
+      {
+        type: 'movie',
+        id: 'streampulse_watchlist',
+        name: 'StreamPulse: Movies Watchlist'
       }
     ],
     idPrefixes: ['tt', 'streampulse:']

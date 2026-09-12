@@ -54,15 +54,24 @@ export default function App() {
   // Modals & Drawers
   const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
+  const [isDetailFromSearch, setIsDetailFromSearch] = useState<boolean>(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState<boolean>(false);
   const [isAndroidModalOpen, setIsAndroidModalOpen] = useState<boolean>(false);
   const [isNuvioModalOpen, setIsNuvioModalOpen] = useState<boolean>(false);
 
-  // Watchlist persistence in localStorage & server sync for Bingecat Addon
+  // Watchlist persistence in localStorage & server sync for Stremio / Nuvio Addon
   const [watchlist, setWatchlist] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('streampulse_watchlist');
-      return saved ? JSON.parse(saved) : ['severance', 'the-last-of-us', 'stranger-things'];
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return Array.from(
+            new Set(parsed.filter((x): x is string => typeof x === 'string' && !!x.trim()))
+          );
+        }
+      }
+      return ['severance', 'the-last-of-us', 'stranger-things'];
     } catch {
       return ['severance', 'the-last-of-us', 'stranger-things'];
     }
@@ -71,16 +80,17 @@ export default function App() {
   useEffect(() => {
     try {
       localStorage.setItem('streampulse_watchlist', JSON.stringify(watchlist));
-      // Sync with server backend for Bingecat Addon catalog
+      // Sync with server backend for Stremio addon catalog
+      const customSeries = seriesList.filter((s) => watchlist.includes(s.id));
       apiFetch('/api/watchlist/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ watchlist }),
+        body: JSON.stringify({ watchlist, customSeries }),
       }).catch((e) => console.log('Watchlist sync error', e));
     } catch (e) {
       console.error(e);
     }
-  }, [watchlist]);
+  }, [watchlist, seriesList]);
 
   // Fetch initial data
   useEffect(() => {
@@ -95,7 +105,19 @@ export default function App() {
         const seriesData = await seriesRes.json();
 
         setProviders(provData);
-        setSeriesList(seriesData.series || []);
+        // Guarantee clean deduplication of initial series and movies
+        const seenIds = new Set<string>();
+        const seenTitles = new Set<string>();
+        const deduped: Series[] = [];
+        for (const s of (seriesData.series || [])) {
+          if (!s || !s.id || seenIds.has(s.id)) continue;
+          const key = `${s.title.toLowerCase().trim()}-${s.mediaType || 'series'}`;
+          if (seenTitles.has(key)) continue;
+          seenIds.add(s.id);
+          seenTitles.add(key);
+          deduped.push(s);
+        }
+        setSeriesList(deduped);
       } catch (err) {
         console.error('Failed to load initial data:', err);
       } finally {
@@ -106,31 +128,80 @@ export default function App() {
   }, []);
 
   const handleToggleWatchlist = (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setWatchlist((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setWatchlist((prev) => {
+      const target = seriesList.find((s) => s.id === id);
+      const isAlreadyWatchlisted =
+        prev.includes(id) ||
+        (target
+          ? prev.some((wid) => {
+              const item = seriesList.find((s) => s.id === wid);
+              return (
+                item &&
+                ((target.imdbId && item.imdbId && target.imdbId === item.imdbId) ||
+                  item.title.toLowerCase().trim() === target.title.toLowerCase().trim())
+              );
+            })
+          : false);
+
+      if (isAlreadyWatchlisted) {
+        // Remove id AND any aliases (matching title or IMDb ID)
+        return prev.filter((wid) => {
+          if (wid === id) return false;
+          if (target) {
+            const item = seriesList.find((s) => s.id === wid);
+            if (item) {
+              if (target.imdbId && item.imdbId && target.imdbId === item.imdbId) return false;
+              if (item.title.toLowerCase().trim() === target.title.toLowerCase().trim()) return false;
+            }
+          }
+          return true;
+        });
+      } else {
+        // Add id, strictly preventing duplicate strings
+        return Array.from(new Set([...prev, id]));
+      }
+    });
   };
 
   const upsertSeries = (series: Series) => {
     setSeriesList((prev) => {
-      const existing = prev.findIndex((s) => s.id === series.id);
+      const existing = prev.findIndex(
+        (s) =>
+          s.id === series.id ||
+          (s.title.toLowerCase().trim() === series.title.toLowerCase().trim() &&
+            s.mediaType === series.mediaType)
+      );
       if (existing < 0) return [series, ...prev];
       const next = [...prev];
-      next[existing] = series;
+      next[existing] = { ...next[existing], ...series };
       return next;
     });
   };
 
   const handleFavoriteFromSearch = (series: Series) => {
-    if (watchlist.includes(series.id)) {
+    const isAlreadyIn =
+      watchlist.includes(series.id) ||
+      watchlist.some((wid) => {
+        const existing = seriesList.find((s) => s.id === wid);
+        return (
+          existing &&
+          ((series.imdbId && existing.imdbId && series.imdbId === existing.imdbId) ||
+            existing.title.toLowerCase().trim() === series.title.toLowerCase().trim())
+        );
+      });
+
+    if (isAlreadyIn) {
       handleToggleWatchlist(series.id);
       return;
     }
     if (!seriesList.some((s) => s.id === series.id)) {
       upsertSeries(series);
     }
-    setWatchlist((prev) => (prev.includes(series.id) ? prev : [...prev, series.id]));
+    setWatchlist((prev) => Array.from(new Set([...prev, series.id])));
   };
 
   const handleScanLiveTheaters = async () => {
@@ -164,6 +235,7 @@ export default function App() {
 
   const handleOpenDetail = (series: Series) => {
     setSelectedSeries(series);
+    setIsDetailFromSearch(false);
     setIsDetailModalOpen(true);
   };
 
@@ -393,7 +465,17 @@ export default function App() {
       });
     }
 
-    return list;
+    // Final deduplication layer to guarantee no card duplicates
+    const seen = new Set<string>();
+    const seenTitles = new Set<string>();
+    return list.filter((item) => {
+      if (!item || !item.id || seen.has(item.id)) return false;
+      const key = `${item.title.toLowerCase().trim()}-${item.mediaType || 'series'}`;
+      if (seenTitles.has(key)) return false;
+      seen.add(item.id);
+      seenTitles.add(key);
+      return true;
+    });
   }, [
     seriesList,
     activeCategory,
@@ -853,7 +935,11 @@ export default function App() {
       <SeriesDetailModal
         series={selectedSeries}
         isOpen={isDetailModalOpen}
-        onClose={() => setIsDetailModalOpen(false)}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setIsDetailFromSearch(false);
+        }}
+        isFromSearch={isDetailFromSearch}
         isWatchlisted={selectedSeries ? watchlist.includes(selectedSeries.id) : false}
         onToggleWatchlist={(id) => handleToggleWatchlist(id)}
       />
@@ -865,6 +951,7 @@ export default function App() {
         initialQuery={searchQuery}
         onSelectSeries={(series) => {
           setSelectedSeries(series);
+          setIsDetailFromSearch(true);
           setIsDetailModalOpen(true);
         }}
         onToggleWatchlist={handleFavoriteFromSearch}

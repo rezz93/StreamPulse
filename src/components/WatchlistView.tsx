@@ -26,7 +26,24 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
   onClearFilters,
   onOpenNuvioModal,
 }) => {
-  const showsWithNewSeasons = watchlistedSeries.filter(
+  // Guarantee strict deduplication of watchlisted items by ID and title
+  const uniqueWatchlistedSeries = React.useMemo(() => {
+    const seenIds = new Set<string>();
+    const seenTitles = new Set<string>();
+    const result: Series[] = [];
+    for (const s of watchlistedSeries) {
+      if (!s || !s.id) continue;
+      if (seenIds.has(s.id)) continue;
+      const titleKey = `${s.title.toLowerCase().trim()}-${s.mediaType || 'series'}`;
+      if (seenTitles.has(titleKey)) continue;
+      seenIds.add(s.id);
+      seenTitles.add(titleKey);
+      result.push(s);
+    }
+    return result;
+  }, [watchlistedSeries]);
+
+  const showsWithNewSeasons = uniqueWatchlistedSeries.filter(
     (s) => s.hasNewSeasonAlert || ['season_upcoming', 'renewed', 'in_production', 'final_season_upcoming'].includes(s.renewalState)
   );
 
@@ -76,7 +93,7 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
       </div>
 
       {/* Shows List */}
-      {watchlistedSeries.length > 0 ? (
+      {uniqueWatchlistedSeries.length > 0 ? (
         <div className="space-y-6">
           {showsWithNewSeasons.length > 0 && (
             <div className="p-4 rounded-2xl bg-indigo-950/20 border border-indigo-500/30 flex items-center gap-3 text-xs sm:text-sm text-indigo-200">
@@ -88,7 +105,7 @@ export const WatchlistView: React.FC<WatchlistViewProps> = ({
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-            {watchlistedSeries.map((s) => (
+            {uniqueWatchlistedSeries.map((s) => (
               <SeriesCard
                 key={s.id}
                 series={s}

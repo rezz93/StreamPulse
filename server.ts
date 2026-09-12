@@ -10,7 +10,23 @@ import { searchTvmazeShows } from "./shared/tvmazeService";
 import { searchWikipediaMedia } from "./shared/wikipediaService";
 import { Series, StreamingProviderId } from "./src/types";
 
-let seriesDatabase: Series[] = [
+function deduplicateSeriesCatalog(items: Series[]): Series[] {
+  const seenIds = new Set<string>();
+  const seenTitles = new Set<string>();
+  const result: Series[] = [];
+  for (const s of items) {
+    if (!s || !s.id) continue;
+    if (seenIds.has(s.id)) continue;
+    const titleKey = `${s.title.toLowerCase().trim()}-${s.mediaType || 'series'}`;
+    if (seenTitles.has(titleKey)) continue;
+    seenIds.add(s.id);
+    seenTitles.add(titleKey);
+    result.push(s);
+  }
+  return result;
+}
+
+let seriesDatabase: Series[] = deduplicateSeriesCatalog([
   ...INITIAL_SERIES_DATABASE.map(s => {
     const mapping = IMDB_MAPPING[s.id];
     return {
@@ -19,7 +35,7 @@ let seriesDatabase: Series[] = [
     };
   }),
   ...MOVIES_DATABASE
-];
+]);
 let currentServerWatchlist: string[] = ['severance', 'the-last-of-us', 'stranger-things', 'the-bear', 'house-of-the-dragon', 'shogun'];
 
 async function startServer() {
@@ -297,9 +313,32 @@ async function startServer() {
   });
 
   app.post("/api/watchlist/sync", (req: Request, res: Response) => {
-    const { watchlist } = req.body;
+    const { watchlist, customSeries } = req.body;
     if (Array.isArray(watchlist)) {
-      currentServerWatchlist = watchlist;
+      // Deduplicate watchlist strings
+      currentServerWatchlist = Array.from(
+        new Set(watchlist.filter((id): id is string => typeof id === "string" && !!id.trim()))
+      );
+
+      // If custom/searched series were passed, upsert into seriesDatabase so Stremio can catalog them
+      if (Array.isArray(customSeries)) {
+        for (const item of customSeries) {
+          if (item && item.id) {
+            const existingIdx = seriesDatabase.findIndex(
+              (s) =>
+                s.id === item.id ||
+                (s.title.toLowerCase().trim() === item.title.toLowerCase().trim() &&
+                  s.mediaType === item.mediaType)
+            );
+            if (existingIdx >= 0) {
+              seriesDatabase[existingIdx] = { ...seriesDatabase[existingIdx], ...item };
+            } else {
+              seriesDatabase.push(item);
+            }
+          }
+        }
+      }
+
       res.json({ success: true, count: currentServerWatchlist.length });
     } else {
       res.status(400).json({ error: "Invalid watchlist array" });
@@ -355,6 +394,9 @@ async function startServer() {
   const handleCatalog = (req: Request, res: Response) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     const { catalogId, type } = req.params;
     const queryWatchlist = req.query.watchlist as string;
     
@@ -367,9 +409,18 @@ async function startServer() {
 
     if (catalogId === 'streampulse_watchlist') {
       items = seriesDatabase.filter(s => activeWatchlist.includes(s.id));
-      if (items.length === 0) {
-        items = seriesDatabase.slice(0, 6);
+      if (type === 'movie') {
+        items = items.filter(s => s.mediaType === 'movie');
+      } else if (type === 'series') {
+        items = items.filter(s => s.mediaType !== 'movie');
       }
+      // Deduplicate items in watchlist catalog
+      const seen = new Set<string>();
+      items = items.filter(s => {
+        if (seen.has(s.id)) return false;
+        seen.add(s.id);
+        return true;
+      });
     } else if (catalogId === 'streampulse_upcoming') {
       items = seriesDatabase.filter(s => s.mediaType !== 'movie' && (s.isUpcoming || (s.nextSeasonDaysLeft !== undefined && s.nextSeasonDaysLeft > 0 && s.nextSeasonDaysLeft <= 180)));
     } else if (catalogId === 'streampulse_renewals') {

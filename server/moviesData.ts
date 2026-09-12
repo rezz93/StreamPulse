@@ -3157,9 +3157,29 @@ const CORE_MOVIES: Series[] = [
 }
 ];
 
-export const MOVIES_DATABASE: Series[] = [
-  ...CORE_MOVIES,
-  ...CLASSIC_MOVIES_DATABASE,
-  ...DOMESTIC_THEATRICAL_2026_MOVIES
-];
+function deduplicateMovies(lists: Series[][]): Series[] {
+  const seenIds = new Set<string>();
+  const seenTitles = new Set<string>();
+  const result: Series[] = [];
+
+  for (const list of lists) {
+    for (const movie of list) {
+      if (!movie || !movie.id) continue;
+      if (seenIds.has(movie.id)) continue;
+      const titleKey = `${movie.title.toLowerCase().trim()}-${movie.firstAirYear || ''}`;
+      if (seenTitles.has(titleKey)) continue;
+
+      seenIds.add(movie.id);
+      seenTitles.add(titleKey);
+      result.push(movie);
+    }
+  }
+  return result;
+}
+
+export const MOVIES_DATABASE: Series[] = deduplicateMovies([
+  DOMESTIC_THEATRICAL_2026_MOVIES,
+  CLASSIC_MOVIES_DATABASE,
+  CORE_MOVIES,
+]);
 

@@ -9,7 +9,23 @@ const outDir = process.argv[2] || 'dist/api';
 fs.mkdirSync(outDir, { recursive: true });
 const distDir = path.resolve(outDir, '..');
 
-const combinedSeries = [
+function deduplicateSeriesCatalog(items: any[]): any[] {
+  const seenIds = new Set<string>();
+  const seenTitles = new Set<string>();
+  const result: any[] = [];
+  for (const s of items) {
+    if (!s || !s.id) continue;
+    if (seenIds.has(s.id)) continue;
+    const titleKey = `${s.title.toLowerCase().trim()}-${s.mediaType || 'series'}`;
+    if (seenTitles.has(titleKey)) continue;
+    seenIds.add(s.id);
+    seenTitles.add(titleKey);
+    result.push(s);
+  }
+  return result;
+}
+
+const combinedSeries = deduplicateSeriesCatalog([
   ...INITIAL_SERIES_DATABASE.map(s => {
     const mapping = IMDB_MAPPING[s.id];
     return {
@@ -18,7 +34,7 @@ const combinedSeries = [
     };
   }),
   ...MOVIES_DATABASE
-];
+]);
 
 // Write providers.json
 const providersPath = path.join(outDir, 'providers.json');

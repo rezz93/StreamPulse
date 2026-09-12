@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Series } from '../types';
 import { Bookmark, Film, Search, X, Loader2, Tv, Sparkles, Star, Clapperboard, Clock, Globe, Database, Radio, CheckCircle2 } from 'lucide-react';
 import { liveSearchTitles } from '../apiClient';
@@ -41,6 +41,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
   const [hasSearched, setHasSearched] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'theaters' | 'movies' | 'series'>('all');
   const [sourceFilter, setSourceFilter] = useState<'all' | 'wikipedia' | 'tvmaze' | 'catalog'>('all');
+  const lastInitialQueryRef = useRef<string>('');
 
   const runSearch = useCallback(async (searchQuery: string) => {
     const trimmed = searchQuery.trim();
@@ -59,19 +60,29 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     }
   }, []);
 
-  // Synchronize search term from main screen when modal opens or initialQuery changes
+  // Synchronize search term from main screen when modal opens with a new search term
   useEffect(() => {
     if (isOpen) {
       const term = (initialQuery || '').trim();
-      setQuery(initialQuery || '');
-      if (term) {
+      if (term && term !== lastInitialQueryRef.current) {
+        lastInitialQueryRef.current = term;
+        setQuery(term);
         void runSearch(term);
-      } else {
-        setResults([]);
-        setHasSearched(false);
       }
     }
   }, [isOpen, initialQuery, runSearch]);
+
+  // Close on Escape key when search modal is top-level
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -326,7 +337,6 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                     className="flex items-center gap-3 overflow-hidden cursor-pointer flex-1"
                     onClick={() => {
                       onSelectSeries(series);
-                      onClose();
                     }}
                   >
                     <img
@@ -396,7 +406,6 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                     <button
                       onClick={() => {
                         onSelectSeries(series);
-                        onClose();
                       }}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 text-amber-300 text-xs font-semibold hover:bg-amber-500 hover:text-zinc-950 transition-all cursor-pointer"
                     >

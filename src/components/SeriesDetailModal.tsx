@@ -19,6 +19,7 @@ import {
   Users,
   Layers,
   AlertTriangle,
+  ArrowLeft,
 } from 'lucide-react';
 
 interface SeriesDetailModalProps {
@@ -27,6 +28,7 @@ interface SeriesDetailModalProps {
   onClose: () => void;
   isWatchlisted: boolean;
   onToggleWatchlist: (id: string) => void;
+  isFromSearch?: boolean;
 }
 
 export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
@@ -35,6 +37,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
   onClose,
   isWatchlisted,
   onToggleWatchlist,
+  isFromSearch = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'seasons' | 'upcoming_intel' | 'cast'>('seasons');
   const [aiIntel, setAiIntel] = useState<AISeasonIntel | null>(null);
@@ -53,15 +56,18 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
     }
   }, [series]);
 
-  // Close on escape key
+  // Close on escape key with capture to prevent closing underlying search modal
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        onClose();
+      }
     };
     if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
+      window.addEventListener('keydown', handleKeyDown, true);
     }
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen, onClose]);
 
   if (!isOpen || !series) return null;
@@ -98,7 +104,7 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
   return (
     <div
       id="series-detail-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto"
       onClick={onClose}
     >
       <div
@@ -106,6 +112,19 @@ export const SeriesDetailModal: React.FC<SeriesDetailModalProps> = ({
         className="relative w-full max-w-4xl bg-zinc-900 border border-zinc-700/80 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl my-auto text-zinc-100 animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Back to Search Results Button (when opened from Search) */}
+        {isFromSearch && (
+          <button
+            id="btn-back-to-search"
+            onClick={onClose}
+            className="absolute top-4 left-4 z-30 flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-black/70 hover:bg-zinc-900 text-zinc-200 hover:text-amber-400 border border-white/20 backdrop-blur-md transition-all cursor-pointer shadow-lg text-xs font-bold"
+            title="Return to Search Results"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Search Results</span>
+          </button>
+        )}
+
         {/* Close Button */}
         <button
           id="btn-close-modal"

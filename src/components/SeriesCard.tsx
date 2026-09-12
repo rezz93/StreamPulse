@@ -67,8 +67,14 @@ export const SeriesCard: React.FC<SeriesCardProps> = ({
           {/* Watchlist Bookmark Button */}
           <button
             id={`btn-watchlist-${series.id}`}
-            onClick={(e) => onToggleWatchlist(series.id, e)}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onToggleWatchlist(series.id, e);
+            }}
             title={isWatchlisted ? 'Remove from Watchlist' : 'Add to Watchlist'}
+            aria-label={isWatchlisted ? `Remove ${series.title} from Watchlist` : `Add ${series.title} to Watchlist`}
             className={`p-2 rounded-xl backdrop-blur-md transition-all cursor-pointer border ${
               isWatchlisted
                 ? 'bg-amber-500 text-zinc-950 border-amber-400 font-bold shadow-md ring-2 ring-amber-400/30'
