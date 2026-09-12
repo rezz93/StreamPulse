@@ -408,7 +408,14 @@ async function startServer() {
     let items: Series[] = [];
 
     if (catalogId === 'streampulse_watchlist') {
-      items = seriesDatabase.filter(s => activeWatchlist.includes(s.id));
+      const activeSet = new Set(activeWatchlist.map(x => x.toLowerCase().trim()));
+      items = seriesDatabase.filter(s => {
+        if (activeSet.has(s.id.toLowerCase())) return true;
+        if (s.imdbId && activeSet.has(s.imdbId.toLowerCase())) return true;
+        const mapping = IMDB_MAPPING[s.id];
+        if (mapping?.imdbId && activeSet.has(mapping.imdbId.toLowerCase())) return true;
+        return false;
+      });
       if (type === 'movie') {
         items = items.filter(s => s.mediaType === 'movie');
       } else if (type === 'series') {

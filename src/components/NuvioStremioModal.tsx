@@ -275,23 +275,26 @@ export const NuvioStremioModal: React.FC<NuvioStremioModalProps> = ({
         {/* Shelves included */}
         <div className="p-3.5 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 space-y-2">
           <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
-            Catalogs Registered in Nuvio
+            Catalogs Registered in Stremio & Nuvio
           </span>
           <div className="flex flex-wrap gap-2 text-xs">
             <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-medium flex items-center gap-1.5">
-              <Sparkles className="w-3 h-3" /> Upcoming Premieres
+              <Sparkles className="w-3 h-3" /> Upcoming Premieres (Series)
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-medium flex items-center gap-1.5">
-              <Tv className="w-3 h-3" /> Renewed Season Radar
+              <Tv className="w-3 h-3" /> Renewed Season Radar (Series)
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 font-medium flex items-center gap-1.5">
-              <Film className="w-3 h-3" /> Top Rated Shows
+              <Film className="w-3 h-3" /> Top Rated Shows (Series)
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-300 font-medium flex items-center gap-1.5">
-              <Film className="w-3 h-3" /> Curated Movies & Cinema
+              <Film className="w-3 h-3" /> Featured Cinema & Hits (Movies)
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-medium flex items-center gap-1.5">
-              <Bookmark className="w-3 h-3" /> My Watchlist
+              <Bookmark className="w-3 h-3" /> Series Watchlist
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 font-medium flex items-center gap-1.5">
+              <Bookmark className="w-3 h-3" /> Movies Watchlist
             </span>
           </div>
         </div>

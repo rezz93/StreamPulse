@@ -86,22 +86,26 @@ const moviesList = combinedSeries.filter(s => s.mediaType === 'movie');
 const watchlistDefaults = combinedSeries
   .filter(s => ['severance', 'the-last-of-us', 'stranger-things', 'shogun', 'the-bear', 'dune-part-two'].includes(s.id));
 
-const catalogs: Record<string, { type: string; items: any[] }> = {
-  streampulse_upcoming: { type: 'series', items: upcomingSeries },
-  streampulse_renewals: { type: 'series', items: renewalsSeries },
-  streampulse_trending: { type: 'series', items: trendingSeries },
-  streampulse_movies: { type: 'movie', items: moviesList },
-  streampulse_watchlist: { type: 'series', items: watchlistDefaults }
-};
+const movieWatchlistDefaults = combinedSeries
+  .filter(s => s.mediaType === 'movie' && ['dune-part-two', 'the-dark-knight', 'interstellar', 'oppenheimer'].includes(s.id));
 
-for (const [catId, { type, items }] of Object.entries(catalogs)) {
+const catalogs: { id: string; type: string; items: any[] }[] = [
+  { id: 'streampulse_upcoming', type: 'series', items: upcomingSeries },
+  { id: 'streampulse_renewals', type: 'series', items: renewalsSeries },
+  { id: 'streampulse_trending', type: 'series', items: trendingSeries },
+  { id: 'streampulse_movies', type: 'movie', items: moviesList },
+  { id: 'streampulse_watchlist', type: 'series', items: watchlistDefaults },
+  { id: 'streampulse_watchlist', type: 'movie', items: movieWatchlistDefaults }
+];
+
+for (const { id: catId, type, items } of catalogs) {
   const metaItems = items.map(seriesToMetaItem);
   const payload = { metas: metaItems };
 
   writeJson(path.join(distDir, 'catalog', type, `${catId}.json`), payload);
   writeJson(path.join(distDir, 'stremio', 'catalog', type, `${catId}.json`), payload);
 }
-console.log(`Wrote ${Object.keys(catalogs).length} catalogs`);
+console.log(`Wrote ${catalogs.length} catalogs`);
 
 // 3. Meta detail files for each item
 let metaCount = 0;
